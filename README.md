@@ -1,8 +1,9 @@
 # News Center
 
 Israeli live TV in one multiview screen, with a mixer: watch several channels side by side, hear
-exactly the ones you want, and follow the news next to them. News Center comes as an **Android app**
-and a **Windows app**, with the same channels, the same sound rules and the same news sources.
+exactly the ones you want, follow the news next to them, and see what the Knesset is doing today.
+News Center comes as an **Android app** and a **Windows app**, with the same channels, the same
+sound rules, the same news sources and the same Knesset view.
 
 [עברית למטה](#עברית)
 
@@ -13,7 +14,9 @@ and a **Windows app**, with the same channels, the same sound rules and the same
 | Source | [`android/`](android) (Kotlin, Jetpack Compose, Media3) | [`app/`](app) and [`host/`](host) (HTML/JS in WebView2, C#) |
 
 How the Android app was made, what's in version 1.0.0 and how to try it:
-[docs/rounds/01-android-app.md](docs/rounds/01-android-app.md).
+[docs/rounds/01-android-app.md](docs/rounds/01-android-app.md). The Knesset view:
+[docs/rounds/02-knesset-view.md](docs/rounds/02-knesset-view.md) (Windows) and
+[docs/rounds/03-news-center.md](docs/rounds/03-news-center.md) (Android, and the new name).
 
 ## Channels
 
@@ -44,7 +47,8 @@ they go live.
 
 Updates: install the newer APK over the old one, or add `https://github.com/EyalShimshi/news-center`
 to [Obtainium](https://obtainium.imranr.dev/) to be told about new versions. Every change to the
-code also produces a development build (a pre-release named "News Center build N").
+code also produces a development build (a pre-release named "News Center build N"). Version 1.2.0
+is the first under the News Center name and installs as a new app: uninstall the earlier one.
 
 ### Watch
 
@@ -88,6 +92,23 @@ Washington Post, CNBC, Sky News, Fox News, CBS News, NPR, Axios, France 24, DW a
 **Add source** takes any RSS or Atom feed, or a news site's home page that names its feed. If a
 network's web filter blocks a site, its row says so.
 
+### Knesset
+
+The Knesset's day-to-day work, in Hebrew, straight from the Knesset's own data – the same view as
+the Windows app, laid out for a phone and in the app's colors:
+
+- **היום** (Today): what's on air now, today's plenum and committee sessions with their agendas,
+  the next plenum sitting and the week ahead in the committees.
+- **ועדות** (Committees), **מליאה** (Plenum), **הצבעות** (Votes) and **חקיקה** (Legislation): every
+  committee with its members and sessions, the sittings, every vote and how each MK voted, every
+  bill with its stage in plain words.
+- **חברי הכנסת** (MKs) and **ממשלה** (Government): all 120 MKs (who's in the building now) and the
+  government. **מדריך** (Guide): how the Knesset works, with a glossary.
+
+Tap an item for its details; back closes them. **צפייה** (watch) on a live session opens it on the
+Watch screen as the big channel, heard alone. Recordings play in a player you can seek in, with the
+channels silent until you close it. Links to the Knesset's pages and documents open in your browser.
+
 ### Channel 12
 
 Mako's streams only play in Mako's own player, so the Channel 12 tile shows Mako's live page with
@@ -115,8 +136,9 @@ grid and recordings play in place. See [DESKTOP.md](DESKTOP.md) and, for the Kne
 ## Privacy
 
 No accounts, no ads, no analytics, no tracking. The apps talk only to the broadcasters' streams and
-pages, knesset.tv, and the news sites you switch on. Your channels, sources and settings stay on
-your device. See [PRIVACY.md](PRIVACY.md).
+pages, knesset.tv, the Knesset's data services (knesset.gov.il) while the Knesset view is open, and
+the news sites you switch on. Your channels, sources and settings stay on your device. See
+[PRIVACY.md](PRIVACY.md).
 
 ## Disclaimer
 
@@ -165,6 +187,9 @@ Icons (Apache-2.0).
 - **מסך מלא** עם מעבר בין ערוצים, ו**תמונה בתוך תמונה** כשיוצאים מהאפליקציה.
 - **חדשות:** 32 מקורות בעברית ובאנגלית (חמישה פעילים בהתחלה), סינון לפי מקור, משיכה לרענון,
   והוספת כל פיד RSS או Atom.
+- **הכנסת:** מה קורה היום במליאה ובוועדות, הוועדות וחבריהן, ההצבעות ואיך הצביע כל ח״כ, הצעות החוק
+  ובאיזה שלב כל אחת, כל 120 חברי הכנסת, הממשלה ומדריך עם מילון מונחים – ישירות מהמידע של הכנסת.
+  דיון חי נפתח כערוץ הגדול, והקלטות מתנגנות בנגן עם אפשרות דילוג.
 - **ניהול ערוצים:** הפעלה וכיבוי, שינוי סדר, הוספת ערוץ (כתובת m3u8, קוד הטמעה או קישור watch.knesset.tv), בדיקה ואיפוס.
 - ממשק בעברית ובאנגלית, ערכה כהה כברירת מחדל.
 

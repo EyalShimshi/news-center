@@ -264,7 +264,9 @@ const settle = async (what, timeout = 90000) => {
 const detailOpen = () => evaluate(`(() => { const d = document.querySelector('${ROOT_SEL} .kn-detail'); return Boolean(d && !d.hidden); })()`);
 const messages = () => evaluate('window.__hostMessages.slice()');
 
-// Nothing sticks out sideways: the page and its lists fit the screen (sideways lists excepted).
+// Nothing sticks out sideways: the page and its lists fit the screen (sideways lists excepted). On
+// the desktop the view is measured, not the dashboard document around it.
+let measureView = false;
 async function checkFits(label) {
   const info = await evaluate(`(() => {
     const scrollers = '.kn-tabs, .kn-chips, .kn-faction-list';
@@ -274,7 +276,9 @@ async function checkFits(label) {
       return r.width > 0 && r.height > 0 && (r.right > innerWidth + 1 || r.left < -1);
     }).slice(0, 4).map(el => (el.className && typeof el.className === 'string' ? '.' + el.className.split(' ')[0] : el.tagName.toLowerCase()) + ':' + (el.textContent || '').trim().slice(0, 30));
     const main = document.querySelector('${ROOT_SEL} .kn-main');
-    return { page: document.documentElement.scrollWidth - innerWidth, main: main.scrollWidth - main.clientWidth, out };
+    const view = document.querySelector('${ROOT_SEL}');
+    const page = ${measureView} ? view.scrollWidth - view.clientWidth : document.documentElement.scrollWidth - innerWidth;
+    return { page, main: main.scrollWidth - main.clientWidth, out };
   })()`);
   check(`${label}: fits the screen`, info.page <= 1 && info.main <= 1 && info.out.length === 0, info.page > 1 || info.main > 1 || info.out.length ? JSON.stringify(info) : '', { hard: true });
 }
@@ -431,6 +435,7 @@ async function androidRun(label, size, theme, { full }) {
 async function desktopRun() {
   const label = 'desktop';
   console.log('\n== desktop (1600x900) ==');
+  measureView = true;
   await cdp('Emulation.clearDeviceMetricsOverride');
   await emulate({ width: 1600, height: 900, scale: 1, mobile: false, dark: true });
   await cdp('Page.navigate', { url: `${base}/app/index.html` });

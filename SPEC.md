@@ -36,8 +36,10 @@ Every request so far, in order, and where it stands on each platform.
 | R16 | Drag tiles to rearrange | ✅ | ✅ (long-press and drag) |
 | R17 | Hide the green meter on any stream | ✅ | ✅ (per channel and all) |
 | R18 | A mobile app, the Shidur way, in a public repo with an installable APK release | – | ✅ this round ([docs/rounds/01-android-app.md](docs/rounds/01-android-app.md)) |
-| R19 | A section about the Knesset's day-to-day work (committees and everything else), thorough but easy to understand, from a deep scan of the Knesset's website | ✅ the Knesset view, in Hebrew ([docs/rounds/02-knesset-view.md](docs/rounds/02-knesset-view.md), [docs/knesset-data.md](docs/knesset-data.md)) | – (a next option) |
-| R20 | Never contact one news site again, no network events at all; leave no traces | ✅ (removed; blocked in the page, the fetch bridge, redirects, the browser engine and links) | ✅ (removed; blocked in the fetch layer, sources, channels, headline links and the web-page channel) |
+| R19 | A section about the Knesset's day-to-day work (committees and everything else), thorough but easy to understand, from a deep scan of the Knesset's website | ✅ the Knesset view, in Hebrew ([docs/rounds/02-knesset-view.md](docs/rounds/02-knesset-view.md), [docs/knesset-data.md](docs/knesset-data.md)) | ✅ the Knesset tab (R21) |
+| R20 | Never contact one news site again, no network events at all; leave no traces | ✅ (removed; blocked in the page, the fetch bridge, redirects, the browser engine and links) | ✅ (removed; blocked in the fetch layer, sources, channels, headline links, the web-page channel and the Knesset page) |
+| R21 | All the Knesset view in the APK, like in the Windows app | ✅ (the same files) | ✅ the Knesset tab ([docs/rounds/03-news-center.md](docs/rounds/03-news-center.md)) |
+| R22 | The repository is now `news-center`: change everything from the old name to the new one | ✅ | ✅ |
 
 ## 3. Decision log
 
@@ -58,7 +60,7 @@ revisited.
 | D-10 | jsoup for knesset.tv and for feeds (its XML parser is forgiving), plus the desktop's regex fallback for broken feeds; the server's or document's charset, else UTF-8 | Israeli feeds include windows-1255 and imperfect XML |
 | D-11 | Streams and pages are requested with the phone's own WebView User-Agent | Sites treat News Center like the browser on the same phone |
 | D-12 | Dark theme by default; Material 3 with a blue accent from the icon, wallpaper colors optional | Video looks best on dark; the desktop app is dark |
-| D-13 | Bottom navigation: Watch, Channels, News; Settings from the menus; a navigation rail on wide screens | Three daily tasks, one tap each |
+| D-13 | Bottom navigation: Watch, Channels, News (and Knesset since 1.2.0, D-23); Settings from the menus; a navigation rail on wide screens | Daily tasks, one tap each |
 | D-14 | Signing with a key created by CI and kept in the Actions cache, the same for every build; a workflow to create a release key later | An installable APK now, with updates installing over each other; see MAINTAINING.md for the public-repo cache risk |
 | D-15 | Every push: build, unit tests, emulator smoke test with a public test stream, then a pre-release; a `v*` tag makes the full release; the Windows app is built in the same run and attached | Nothing is published unless the shrunk APK actually runs; a public test stream is always available, whatever is on air |
 | D-16 | `newscenter://play?url=…&name=…` previews a stream in the spotlight without saving it | Lets the smoke test (and anyone) open a stream directly, without adding channels from outside the app |
@@ -68,18 +70,26 @@ revisited.
 | D-20 | The Knesset view is a full-window view in Hebrew (right-to-left) that covers the channels while they keep playing | The owner's choice (round 2): the Knesset's data is in Hebrew, and the view needs the whole window |
 | D-21 | The Knesset view reads the Knesset's open data (OData v4) and its website's own data service, never the website's pages | Both answer plain requests; the pages sit behind a bot check that holds automated visitors (seen during the scan), so the view only links to them |
 | D-22 | Blocked sites are a list in code (`BLOCKED_DOMAINS` in `app/app.js` and `data/Text.kt`, `BlockedDomains` in `host/src/MainForm.cs`), enforced at every layer; docs don't repeat the names | The owner asked that one site never be contacted; one layer missing (a redirect, a frame, a link) would break that |
+| D-23 | Android shows the Knesset view itself – `knesset.js`, its guide and `knesset.css`, copied from `app/` by the build – in a WebView, as a fourth tab, with a phone layout (`android.css`) | "Like you did on the exe": one view to maintain, so both apps always match; the view is HTML already, and a Compose rewrite of 1,300 lines would drift from it |
+| D-24 | The Android page reads the Knesset through the app (`/__fetch`, answered by `Http`) for HTTPS addresses on knesset.gov.il only; the page can't navigate away, and its links open in the browser | A page can't read other sites itself; the allowlist keeps the page from being a way to reach anything else, and `Http` refuses blocked sites at every redirect (R20) |
+| D-25 | On Android, recordings play in a Media3 player with seeking, over everything, with the channels silent until it closes; live sessions among the channels open on the Watch screen, big and heard alone | The desktop's behavior, with the phone's own player (hardware decoding, seek bar, audio focus) instead of a video element in the page |
+| D-26 | The Knesset page takes the app's Material colors (light or dark, accent or wallpaper colors) | It should look like part of the app, not a web page |
+| D-27 | The new name changes the Android package to `io.github.eyalshimshi.newscenter` (and the CI signing key), so 1.2.0 installs as a new app; the Windows app keeps its settings in a new folder | R22: nothing keeps the old name. Android can't update an app across a package change anyway, so a new key costs nothing more |
+| D-28 | CI tests the Knesset view in headless Chrome against the live services, on a phone, a tablet and the desktop, before anything is published; when the Knesset doesn't answer GitHub's machines, missing data is only a warning | The view depends on two outside services; layout and script errors must still fail the build, but the Knesset being unreachable from the cloud must not |
 
 ## 4. Architecture (Android)
 
 ```
-MainActivity ── NewsCenterApp (Compose: Watch · Channels · News · Settings, fullscreen, PiP)
-      │                 │
+MainActivity ── NewsCenterApp (Compose: Watch · Channels · News · Knesset · Settings, fullscreen, PiP)
+      │                 │                                  │
+      │                 │              KnessetWeb (WebView: assets/knesset/ + app/knesset*.{js,css},
+      │                 │                 /__fetch → Http, KnessetFetch) · RecordingPlayer (Media3)
       └── NewsCenterViewModel ──────────────┬── ChannelStore (prefs) ← assets/channels.json
             │  availability, mix,        ├── NewsController ── NewsStore (prefs) ← assets/news.json
-            │  spotlight/fullscreen      ├── KnessetDiscovery ── Http (HttpURLConnection) ── jsoup
-            │                            ├── StreamCheck (is the playlist live?)
+            │  spotlight/fullscreen,     ├── KnessetDiscovery ── Http (HttpURLConnection) ── jsoup
+            │  Knesset streams, recording├── StreamCheck (is the playlist live?)
             └── PlayerPool ── TilePlayer (ExoPlayer + LevelMeterProcessor) per channel
-                     └── AudioFocus (one request for the app)
+                     └── AudioFocus (one request for the app; given up while a recording plays)
 ```
 
 - **Shown channels** = switched on, listed on knesset.tv (for Knesset streams), and live (or
@@ -116,6 +126,9 @@ MainActivity ── NewsCenterApp (Compose: Watch · Channels · News · Setting
   spotlight. It can't be fullscreen or picture-in-picture.
 - Some streams are geo-restricted to Israel.
 - The CI signing key lives in the Actions cache (see MAINTAINING.md).
+- The Knesset view depends on the Knesset's data services, one of them undocumented; if the Knesset
+  changes them, the affected parts show "couldn't load" (see docs/knesset-data.md). A recording
+  pauses when you leave the app.
 
 ## 7. Next options
 

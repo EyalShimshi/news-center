@@ -274,7 +274,7 @@
 .kn-verdict.no { color: var(--kn-against, #f87171); }
 .kn-factions-votes { display: flex; flex-direction: column; gap: 6px; }
 .kn-factions-votes summary { display: flex; justify-content: space-between; gap: 10px; padding: 6px 8px; border-radius: 8px; background: var(--surface-2); color: var(--text); font-size: 13px; }
-.kn-mini-tally { display: flex; gap: 8px; font-size: 12px; }
+.kn-mini-tally { display: flex; flex: none; gap: 8px; font-size: 12px; white-space: nowrap; }
 .kn-names { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 2px 12px; margin: 6px 0; padding-inline-start: 18px; font-size: 12.5px; }
 .kn-names li.for::marker { color: #22c55e; }
 .kn-names li.against::marker { color: #ef4444; }

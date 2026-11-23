@@ -127,8 +127,9 @@ alone; recordings play in a player over the view, with the channels silenced
 until it closes. Links open the Knesset's website in your browser.
 
 The data comes straight from the Knesset: its open-data service and its website's
-own data service, through the window's fetch bridge. What they offer and how Local
-TV uses them is in [docs/knesset-data.md](docs/knesset-data.md).
+own data service, through the window's fetch bridge. What they offer and how News
+Center uses them is in [docs/knesset-data.md](docs/knesset-data.md). The Android
+app shows the same view, from the same files, in its Knesset tab.
 
 ## Sound
 
@@ -227,7 +228,7 @@ channel list as JSON. To ship a channel with the project, add it to
 | --- | --- |
 | `NewsCenter.exe` | The app window (built from `host/`) |
 | `app/` | The dashboard: `index.html`, `styles.css`, `app.js`, `channels.js` (built-in channels), `news.js` (built-in news sources) |
-| `app/knesset.js`, `app/knesset-guide.js` | The Knesset view, and its Hebrew guide, glossary, bill stages and links |
+| `app/knesset.js`, `app/knesset-guide.js`, `app/knesset.css` | The Knesset view, its Hebrew guide (glossary, bill stages, links) and its styles; the Android app's Knesset tab uses the same three files |
 | `app/page-helper.js` | Runs inside web-page channels (sound, player-only view, meter) |
 | `host/src/` | C# source of the window |
 | `host/build.cmd` | Rebuilds `NewsCenter.exe`; downloads the C# compiler and WebView2 SDK from nuget.org on first use |

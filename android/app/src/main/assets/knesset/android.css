@@ -153,12 +153,14 @@ button, input { font: inherit; color: inherit; }
   gap: 0;
   padding: 0;
 }
-.kn-title { gap: 12px; padding: 12px 16px 2px; }
+.kn-title { grid-row: 1; grid-column: 1; gap: 12px; padding: 12px 16px 2px; }
 .kn-logo { width: 28px; height: 28px; }
 .kn-title h2 { font-size: 20px; font-weight: 700; }
 .kn-sub { font-size: 12.5px; line-height: 1.4; }
-.kn-actions { align-self: start; padding: 6px 6px 0; }
+/* Refresh sits beside the title (left in Hebrew), not on a row of its own. */
+.kn-actions { grid-row: 1; grid-column: 2; align-self: start; padding: 6px 6px 0; }
 .kn-tabs {
+  grid-row: 2;
   grid-column: 1 / -1;
   flex-wrap: nowrap;
   gap: 8px;

@@ -1,13 +1,16 @@
 # The Knesset's website and data, as News Center uses them
 
-A map of what the Knesset publishes and how to read it, made for the Knesset view in the Windows
-app (round 2). Everything here was checked against the live services in November 2026, in the
-first days of the 26th Knesset.
+A map of what the Knesset publishes and how to read it, made for the Knesset view (round 2), which
+both apps show: the Windows app in its window, the Android app in its Knesset tab (round 3).
+Everything here was checked against the live services in November 2026, in the first days of the
+26th Knesset.
 
 ## Two official data sources
 
-Both answer plain HTTPS requests; neither sends CORS headers, so the Windows app reads them
-through its host's fetch bridge (`window.newscenter.fetchText`).
+Both answer plain HTTPS requests; neither sends CORS headers, so the apps read them through their
+own fetch bridges: the Windows app's window (`host.fetchText` in `app/app.js`), and on Android the
+page's `/__fetch` requests, which `KnessetWeb.kt` answers for HTTPS addresses on knesset.gov.il
+only.
 
 | | Open data (OData v4) | The website's own API |
 |---|---|---|
@@ -75,8 +78,8 @@ Requests to avoid (they return 500, or a WAF "access denied" 473): `Entity(key)?
 
 The bundles name about 150 calls in all (committee decisions, conclusions, reports, budget
 requests; MK expenses, speeches, positions; factions and splits; caucuses; the smart plenum
-protocol; secondary legislation; visits). Many are POST and need a JSON body, which the Windows
-app's fetch bridge doesn't send.
+protocol; secondary legislation; visits). Many are POST and need a JSON body, which neither app's
+fetch bridge sends.
 
 The website and the open data use different committee IDs (the website's are permanent across
 Knessets, e.g. 2213 = Finance). `GetAllBroadcasts` links the two for committees that broadcast;
