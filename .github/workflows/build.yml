@@ -2,7 +2,8 @@ name: Build
 
 on:
   push:
-    branches: [main]
+    # dev/* branches are built and tested like main, but nothing is published for them.
+    branches: [main, "dev/**"]
     # A tag such as v1.0.0 makes an official release.
     tags: ["v*"]
   workflow_dispatch:
@@ -18,7 +19,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  KEYSTORE_CACHE_KEY: localtv-debug-keystore-v1
+  KEYSTORE_CACHE_KEY: newscenter-debug-keystore-v1
 
 jobs:
   keep-signing-key:
@@ -127,7 +128,7 @@ jobs:
       - name: Name the APK
         run: |
           if [ "${{ github.ref_type }}" = "tag" ]; then label="${{ github.ref_name }}"; else label="${{ github.run_number }}"; fi
-          cp app/build/outputs/apk/release/app-release.apk "$GITHUB_WORKSPACE/local-tv-$label.apk"
+          cp app/build/outputs/apk/release/app-release.apk "$GITHUB_WORKSPACE/news-center-$label.apk"
           # Decodes crash reports from this build; zipped, it's a tenth of the size.
           cp app/build/outputs/mapping/release/mapping.txt "$GITHUB_WORKSPACE/mapping-$label.txt"
           (cd "$GITHUB_WORKSPACE" && zip -q -9 "mapping-$label.zip" "mapping-$label.txt")
@@ -162,14 +163,14 @@ jobs:
           # Lavapipe, the emulator's current software renderer: with the older SwiftShader modes the
           # whole emulator froze seconds after the test stream started (builds 2-5, SPEC.md D-19).
           emulator-options: -no-window -gpu lavapipe -no-snapshot -noaudio -no-boot-anim
-          script: bash .github/scripts/smoke-test.sh local-tv-${{ env.APK_LABEL }}.apk mapping-${{ env.APK_LABEL }}.txt
+          script: bash .github/scripts/smoke-test.sh news-center-${{ env.APK_LABEL }}.apk mapping-${{ env.APK_LABEL }}.txt
 
       - name: Upload the APK
         uses: actions/upload-artifact@v4
         with:
           name: android
           path: |
-            local-tv-${{ env.APK_LABEL }}.apk
+            news-center-${{ env.APK_LABEL }}.apk
             mapping-${{ env.APK_LABEL }}.zip
 
       - name: Upload the smoke test's screenshots
@@ -182,6 +183,38 @@ jobs:
             decoded.txt
             logcat.txt
             host.txt
+            knesset-errors.txt
+          if-no-files-found: ignore
+
+  # The Knesset view both apps share, on a phone, a tablet and the desktop, against the Knesset's
+  # live services (missing data is only a warning when they don't answer GitHub's machines).
+  knesset-web:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install a Hebrew font for the screenshots
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends fonts-noto-core > /dev/null
+
+      - name: Test the Knesset view
+        run: node .github/scripts/knesset-web-test.mjs knesset-web
+
+      - name: Upload the screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: knesset-web
+          path: knesset-web/
           if-no-files-found: ignore
 
   desktop:
@@ -192,7 +225,7 @@ jobs:
       - name: Check out the code
         uses: actions/checkout@v4
 
-      - name: Build LocalTV.exe
+      - name: Build NewsCenter.exe
         shell: cmd
         run: host\build.cmd
 
@@ -200,23 +233,27 @@ jobs:
         shell: pwsh
         run: |
           $label = if ('${{ github.ref_type }}' -eq 'tag') { '${{ github.ref_name }}' } else { '${{ github.run_number }}' }
-          New-Item -ItemType Directory -Force -Path package/LocalTV | Out-Null
-          Copy-Item LocalTV.exe package/LocalTV/
-          Copy-Item -Recurse app package/LocalTV/app
-          Copy-Item DESKTOP.md package/LocalTV/README.md
-          Copy-Item LICENSE package/LocalTV/LICENSE.txt
-          Compress-Archive -Path package/LocalTV -DestinationPath "local-tv-windows-$label.zip"
+          New-Item -ItemType Directory -Force -Path package/NewsCenter | Out-Null
+          Copy-Item NewsCenter.exe package/NewsCenter/
+          Copy-Item -Recurse app package/NewsCenter/app
+          Copy-Item DESKTOP.md package/NewsCenter/README.md
+          Copy-Item LICENSE package/NewsCenter/LICENSE.txt
+          Compress-Archive -Path package/NewsCenter -DestinationPath "news-center-windows-$label.zip"
 
       - name: Upload the desktop app
         uses: actions/upload-artifact@v4
         with:
           name: desktop
-          path: local-tv-windows-*.zip
+          path: news-center-windows-*.zip
 
   publish:
-    needs: [android, desktop]
-    # The APK is published even if the Windows build failed.
-    if: always() && github.event_name != 'schedule' && needs.android.result == 'success'
+    needs: [android, desktop, knesset-web]
+    # Only main and release tags publish. The APK is published even if the Windows build failed,
+    # but not if the Knesset view is broken.
+    if: >-
+      always() && github.event_name != 'schedule' &&
+      (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')) &&
+      needs.android.result == 'success' && needs.knesset-web.result == 'success'
     runs-on: ubuntu-latest
     steps:
       - name: Check out the release notes
@@ -239,19 +276,19 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: build-${{ github.run_number }}
-          name: Local TV build ${{ github.run_number }}
+          name: News Center build ${{ github.run_number }}
           target_commitish: ${{ github.sha }}
           prerelease: true
           files: |
-            dist/local-tv-${{ github.run_number }}.apk
+            dist/news-center-${{ github.run_number }}.apk
             dist/mapping-${{ github.run_number }}.zip
-            dist/local-tv-windows-${{ github.run_number }}.zip
+            dist/news-center-windows-${{ github.run_number }}.zip
             dist/smoke-*.png
           body: |
             Development build ${{ github.run_number }} (version 1.0-dev.${{ github.run_number }}) of commit ${{ github.sha }}.
 
-            **Android:** open this page on your phone and tap `local-tv-${{ github.run_number }}.apk`, or run `adb install -r local-tv-${{ github.run_number }}.apk`. Android 12 or newer.
-            **Windows:** unzip `local-tv-windows-${{ github.run_number }}.zip` and run `LocalTV.exe`.
+            **Android:** open this page on your phone and tap `news-center-${{ github.run_number }}.apk`, or run `adb install -r news-center-${{ github.run_number }}.apk`. Android 12 or newer.
+            **Windows:** unzip `news-center-windows-${{ github.run_number }}.zip` and run `NewsCenter.exe`.
             The `smoke-*.png` files are screenshots from the emulator test this build passed.
 
       - name: Publish the release
@@ -259,12 +296,12 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
-          name: Local TV ${{ github.ref_name }}
+          name: News Center ${{ github.ref_name }}
           prerelease: false
           make_latest: true
           files: |
-            dist/local-tv-${{ github.ref_name }}.apk
+            dist/news-center-${{ github.ref_name }}.apk
             dist/mapping-${{ github.ref_name }}.zip
-            dist/local-tv-windows-${{ github.ref_name }}.zip
+            dist/news-center-windows-${{ github.ref_name }}.zip
           body_path: RELEASE_NOTES.md
           fail_on_unmatched_files: false

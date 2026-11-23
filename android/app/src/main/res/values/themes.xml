@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Dark from the first frame: Local TV opens in its dark theme unless the user picks another. -->
-    <style name="Theme.LocalTV" parent="Theme.AppCompat.NoActionBar">
+    <!-- Dark from the first frame: News Center opens in its dark theme unless the user picks another. -->
+    <style name="Theme.NewsCenter" parent="Theme.AppCompat.NoActionBar">
         <item name="android:windowBackground">@color/window_background</item>
         <item name="android:windowSplashScreenBackground">@color/window_background</item>
         <item name="android:windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>

@@ -7,11 +7,11 @@ plugins {
 }
 
 android {
-    namespace = "io.github.eyalshimshi.localtv"
+    namespace = "io.github.eyalshimshi.newscenter"
     compileSdk = libs.versions.compileSdk.get().toInt()
 
     defaultConfig {
-        applicationId = "io.github.eyalshimshi.localtv"
+        applicationId = "io.github.eyalshimshi.newscenter"
         minSdk = libs.versions.minSdk.get().toInt()
         targetSdk = libs.versions.targetSdk.get().toInt()
         // CI builds count up, so each new APK installs as an update of the previous one.
@@ -30,7 +30,7 @@ android {
             create("release") {
                 storeFile = keystore
                 storePassword = System.getenv("RELEASE_KEYSTORE_PASSWORD")
-                keyAlias = System.getenv("RELEASE_KEY_ALIAS") ?: "localtv"
+                keyAlias = System.getenv("RELEASE_KEY_ALIAS") ?: "newscenter"
                 keyPassword = System.getenv("RELEASE_KEYSTORE_PASSWORD")
             }
         }
@@ -97,6 +97,7 @@ dependencies {
     implementation(libs.androidx.media3.exoplayer)
     implementation(libs.androidx.media3.exoplayer.hls)
     implementation(libs.androidx.media3.datasource.okhttp)
+    implementation(libs.androidx.media3.ui)
 
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.serialization.json)
@@ -104,4 +105,35 @@ dependencies {
     implementation(libs.jsoup)
 
     testImplementation(libs.junit)
+}
+
+/**
+ * The Knesset screen shows the Windows app's Knesset view: its shared files are copied from app/
+ * into the APK beside the Android page (assets/knesset/), so both apps always show the same view.
+ */
+abstract class SharedKnessetAssets : DefaultTask() {
+    @get:InputFiles
+    @get:PathSensitive(PathSensitivity.NAME_ONLY)
+    abstract val sources: ConfigurableFileCollection
+
+    @get:OutputDirectory
+    abstract val outputDir: DirectoryProperty
+
+    @TaskAction
+    fun copy() {
+        val target = outputDir.get().asFile.resolve("knesset")
+        target.deleteRecursively()
+        target.mkdirs()
+        sources.files.forEach { it.copyTo(target.resolve(it.name), overwrite = true) }
+    }
+}
+
+val sharedKnessetAssets = tasks.register<SharedKnessetAssets>("sharedKnessetAssets") {
+    sources.from(listOf("knesset.js", "knesset-guide.js", "knesset.css").map { rootProject.file("../app/$it") })
+}
+
+androidComponents {
+    onVariants { variant ->
+        variant.sources.assets?.addGeneratedSourceDirectory(sharedKnessetAssets, SharedKnessetAssets::outputDir)
+    }
 }

@@ -1,12 +1,12 @@
 @echo off
 setlocal
-rem Builds ..\LocalTV.exe from the C# sources in src\.
+rem Builds ..\NewsCenter.exe from the C# sources in src\.
 rem The C# compiler and WebView2 SDK are downloaded from nuget.org on first use
-rem and cached in %LOCALAPPDATA%\LocalTV\build-tools.
+rem and cached in %LOCALAPPDATA%\NewsCenter\build-tools.
 
 set "WEBVIEW2_VERSION=1.0.4314.35"
 set "COMPILER_VERSION=5.12.0"
-set "TOOLS=%LOCALAPPDATA%\LocalTV\build-tools"
+set "TOOLS=%LOCALAPPDATA%\NewsCenter\build-tools"
 set "WV2=%TOOLS%\microsoft.web.webview2.%WEBVIEW2_VERSION%"
 set "CSC=%TOOLS%\microsoft.net.compilers.toolset.%COMPILER_VERSION%\tasks\net472\csc.exe"
 set "FX=%WINDIR%\Microsoft.NET\Framework64\v4.0.30319"
@@ -20,7 +20,7 @@ if not exist "%CSC%" (
 )
 
 "%CSC%" /nologo /noconfig /target:winexe /platform:x64 /optimize+ /deterministic+ /langversion:latest /warnaserror+ ^
-  /out:"..\LocalTV.exe" /win32icon:LocalTV.ico /win32manifest:app.manifest ^
+  /out:"..\NewsCenter.exe" /win32icon:NewsCenter.ico /win32manifest:app.manifest ^
   /reference:"%FX%\System.dll" ^
   /reference:"%FX%\System.Core.dll" ^
   /reference:"%FX%\System.Drawing.dll" ^
@@ -32,10 +32,10 @@ if not exist "%CSC%" (
   /resource:"%WV2%\lib\net462\Microsoft.Web.WebView2.Core.dll",lib.Microsoft.Web.WebView2.Core.dll ^
   /resource:"%WV2%\lib\net462\Microsoft.Web.WebView2.WinForms.dll",lib.Microsoft.Web.WebView2.WinForms.dll ^
   /resource:"%WV2%\runtimes\win-x64\native\WebView2Loader.dll",lib.WebView2Loader.dll ^
-  /resource:LocalTV.ico,LocalTV.ico ^
+  /resource:NewsCenter.ico,NewsCenter.ico ^
   src\*.cs || goto :failed
 
-echo Built %~dp0..\LocalTV.exe
+echo Built %~dp0..\NewsCenter.exe
 exit /b 0
 
 :fetch

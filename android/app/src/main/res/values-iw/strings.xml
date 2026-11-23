@@ -1,11 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Local TV</string>
+    <string name="app_name">News Center</string>
 
     <!-- Tabs -->
     <string name="nav_watch">צפייה</string>
     <string name="nav_channels">ערוצים</string>
     <string name="nav_news">חדשות</string>
+    <string name="nav_knesset">הכנסת</string>
+
+    <!-- הכנסת -->
+    <string name="knesset_not_on_air">השידור הזה לא משודר כרגע</string>
+    <string name="action_close_recording">סגירת ההקלטה</string>
+    <string name="recording_error">אי אפשר לנגן את ההקלטה כרגע</string>
 
     <!-- Watch -->
     <string name="watch_checking">בודק אילו ערוצים משדרים…</string>
@@ -79,13 +85,13 @@
     <string name="field_stream_address">כתובת השידור</string>
     <string name="field_page_address">כתובת הדף</string>
     <string name="field_stream_hint">כתובת HLS ‏(m3u8), קוד הטמעה &lt;iframe&gt; או קישור watch.knesset.tv</string>
-    <string name="field_page_hint">הדף מוצג במשבצת שלו, ורק נגן הווידאו שלו נראה כש־Local TV מוצא אותו.</string>
+    <string name="field_page_hint">הדף מוצג במשבצת שלו, ורק נגן הווידאו שלו נראה כש־News Center מוצא אותו.</string>
     <string name="address_invalid">יש להזין כתובת תקינה</string>
     <string name="field_description">תיאור (לא חובה)</string>
     <string name="action_test_stream">בדיקת השידור</string>
     <string name="test_live">משדר</string>
     <string name="test_live_quality">משדר, עד ‎%1$dp‏</string>
-    <string name="test_off_air">לא משדר כרגע (%1$s). אחרי ההוספה Local TV ימשיך לבדוק.</string>
+    <string name="test_off_air">לא משדר כרגע (%1$s). אחרי ההוספה News Center ימשיך לבדוק.</string>
     <string name="test_failed">לא הצלחנו לטעון אותו. ייתכן שהשרת לא זמין, או שהוא לא מאפשר לאפליקציות אחרות לנגן אותו.</string>
     <string name="field_meter">הצגת מד העוצמה</string>
     <string name="page_channel_note" formatted="false">דפי אינטרנט מוצגים רק ברשת ובהגדלה (לא במסך מלא או בתמונה בתוך תמונה), והעוצמה שלהם מוגבלת ל־100%.</string>
@@ -200,20 +206,20 @@
     <string name="language_hebrew">עברית</string>
     <string name="language_english">English</string>
     <string name="settings_about">אודות</string>
-    <string name="about_version">Local TV %1$s</string>
+    <string name="about_version">News Center %1$s</string>
     <string name="about_license">תוכנה חופשית בקוד פתוח (GPL-3.0) · קוד המקור ב־GitHub</string>
     <string name="about_updates">עדכונים</string>
     <string name="about_updates_summary">גרסאות חדשות מתפרסמות ב־GitHub</string>
     <string name="about_privacy">פרטיות</string>
     <string name="about_privacy_summary">בלי חשבונות, בלי פרסומות, בלי מעקב</string>
     <string name="action_report">דיווח על בעיה</string>
-    <string name="about_disclaimer">Local TV היא אפליקציה עצמאית שאינה קשורה לכנסת, לכאן, לקשת, לרשת, לעכשיו 14, לערוץ 16, לערוץ 10, ל־i24NEWS, לערוץ 9 או לאתר חדשות כלשהו. היא מנגנת את השידורים החיים והדפים הציבוריים של הגופים המשדרים עצמם, ופותחת כתבות באתרים שלהם.</string>
+    <string name="about_disclaimer">News Center היא אפליקציה עצמאית שאינה קשורה לכנסת, לכאן, לקשת, לרשת, לעכשיו 14, לערוץ 16, לערוץ 10, ל־i24NEWS, לערוץ 9 או לאתר חדשות כלשהו. היא מנגנת את השידורים החיים והדפים הציבוריים של הגופים המשדרים עצמם, ופותחת כתבות באתרים שלהם.</string>
     <string name="copied">הועתק</string>
     <string name="no_browser">אין אפליקציה שיכולה לפתוח את הקישור</string>
 
     <!-- Crash report -->
-    <string name="crash_title">Local TV נסגרה</string>
-    <string name="crash_body">Local TV נסגרה באופן לא צפוי בפעם הקודמת. אפשר להעתיק את הפרטים, או לשלוח אותם כדיווח ב־GitHub כדי לעזור לתקן.</string>
+    <string name="crash_title">News Center נסגרה</string>
+    <string name="crash_body">News Center נסגרה באופן לא צפוי בפעם הקודמת. אפשר להעתיק את הפרטים, או לשלוח אותם כדיווח ב־GitHub כדי לעזור לתקן.</string>
     <string name="crash_copy">העתקת הפרטים</string>
     <string name="crash_report">דיווח</string>
     <string name="action_dismiss">סגירה</string>

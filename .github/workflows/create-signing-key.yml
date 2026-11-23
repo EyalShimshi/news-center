@@ -26,14 +26,14 @@ jobs:
           echo "::add-mask::$password"
           # RSA 4096, valid for 30 years.
           keytool -genkeypair -keystore release.keystore -storetype PKCS12 \
-            -alias localtv -keyalg RSA -keysize 4096 -validity 10950 \
+            -alias newscenter -keyalg RSA -keysize 4096 -validity 10950 \
             -storepass "$password" -keypass "$password" \
-            -dname "CN=Local TV, O=Local TV, C=IL"
+            -dname "CN=News Center, O=News Center, C=IL"
           mkdir key
           base64 -w0 release.keystore > key/RELEASE_KEYSTORE_BASE64.txt
           printf '%s' "$password" > key/RELEASE_KEYSTORE_PASSWORD.txt
-          cp release.keystore key/localtv-release.keystore
-          keytool -list -keystore release.keystore -storepass "$password" -alias localtv | grep -i fingerprint || true
+          cp release.keystore key/newscenter-release.keystore
+          keytool -list -keystore release.keystore -storepass "$password" -alias newscenter | grep -i fingerprint || true
 
       - name: Offer the key as a download for one day
         uses: actions/upload-artifact@v4

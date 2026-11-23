@@ -3,7 +3,7 @@
  * status codes that mean each stage), short explanations of how the Knesset works, a glossary,
  * and the official pages for more. See docs/knesset-data.md for where the codes come from.
  */
-window.LOCALTV_KNESSET_GUIDE = {
+window.NEWSCENTER_KNESSET_GUIDE = {
   // A bill's path, in order. `statuses` are KNS_Bill.StatusID values; `privateOnly` stages are
   // skipped by government and committee bills, which start at the first reading.
   stages: [

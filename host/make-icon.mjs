@@ -1,4 +1,4 @@
-// Renders ../app/icon.svg into LocalTV.ico (16-256 px) with headless Microsoft Edge.
+// Renders ../app/icon.svg into NewsCenter.ico (16-256 px) with headless Microsoft Edge.
 // Run with: node make-icon.mjs
 import { spawn } from 'node:child_process';
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -14,7 +14,7 @@ const SIZES = [16, 20, 24, 32, 40, 48, 64, 256];
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
 const svg = readFileSync(join(here, '..', 'app', 'icon.svg'));
-const profile = mkdtempSync(join(tmpdir(), 'localtv-icon-'));
+const profile = mkdtempSync(join(tmpdir(), 'newscenter-icon-'));
 const browser = spawn(EDGE, ['--headless=new', `--user-data-dir=${profile}`, '--remote-debugging-port=0', 'about:blank'], { stdio: 'ignore' });
 
 async function render() {
@@ -110,8 +110,8 @@ try {
     directory.writeUInt32LE(offset, at + 12);
     offset += entry.data.length;
   });
-  writeFileSync(join(here, 'LocalTV.ico'), Buffer.concat([directory, ...entries.map(entry => entry.data)]));
-  console.log(`Wrote LocalTV.ico (${SIZES.join(', ')} px)`);
+  writeFileSync(join(here, 'NewsCenter.ico'), Buffer.concat([directory, ...entries.map(entry => entry.data)]));
+  console.log(`Wrote NewsCenter.ico (${SIZES.join(', ')} px)`);
 } finally {
   await closeBrowser();
   await sleep(500);

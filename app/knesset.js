@@ -1,8 +1,13 @@
 /*
- * Local TV's Knesset view: the Knesset's day-to-day work in plain Hebrew – what's on today, the
+ * News Center's Knesset view: the Knesset's day-to-day work in plain Hebrew – what's on today, the
  * committees, the plenum, votes, legislation, MKs, the government, and a guide. It reads the
- * Knesset's open data (OData) and the Knesset website's own API through the dashboard's fetch
- * bridge; see docs/knesset-data.md for both. The dashboard creates it with LocalTVKnesset(api).
+ * Knesset's open data (OData) and the Knesset website's own API through the host's fetch bridge;
+ * see docs/knesset-data.md for both. The Windows dashboard (app.js) and the Android app's Knesset
+ * screen (android/app/src/main/assets/knesset/android.js) create it with NewsCenterKnesset(api):
+ *   fetchText(url) → Promise<{ ok, status, text }>, knessetChannels() → [{ id, name, url, now,
+ *   main, live }], watchChannel(id), refreshChannels(), showToast(message), silenceTv(on),
+ *   onToggle(open), and optionally: embedded (the view is the whole page and never closes),
+ *   playVideo(url, title) (the host plays recordings itself) and onBackState(canGoBack).
  */
 (() => {
   'use strict';
@@ -10,8 +15,8 @@
   const ODATA = 'https://knesset.gov.il/OdataV4/ParliamentInfo/';
   const SITE_API = 'https://knesset.gov.il/WebSiteApi/knessetapi/';
   const SITE = 'https://main.knesset.gov.il';
-  const GUIDE = window.LOCALTV_KNESSET_GUIDE || { stages: [], endings: {}, billTypes: {}, articles: [], glossary: [], links: [] };
-  const STORAGE_KEY = 'localtv.knesset.v1';
+  const GUIDE = window.NEWSCENTER_KNESSET_GUIDE || { stages: [], endings: {}, billTypes: {}, articles: [], glossary: [], links: [] };
+  const STORAGE_KEY = 'newscenter.knesset.v1';
   const TODAY_REFRESH_MS = 60 * 1000;
   const MAX_PAGES = 6;
   const DAY_MS = 24 * 60 * 60 * 1000;
@@ -191,7 +196,7 @@
 
   /* ---------- The view ---------- */
 
-  window.LocalTVKnesset = function createKnessetView(api) {
+  window.NewsCenterKnesset = function createKnessetView(api) {
     const cache = new Map();
     let saved = {};
     try {
@@ -203,6 +208,7 @@
       open: false,
       tab: TABS.some(([id]) => id === saved.tab) ? saved.tab : 'today',
       renderToken: 0,
+      renderedAt: 0,
       refreshTimer: 0,
       billFilter: 'all',
       billSearch: '',
@@ -347,8 +353,10 @@
     const root = h('section', { id: 'knesset', class: 'kn', dir: 'rtl', lang: 'he', 'aria-label': 'הכנסת', hidden: true });
     const subtitle = h('p', { class: 'kn-sub' }, 'טוען…');
     const tabList = h('nav', { class: 'kn-tabs', role: 'tablist', 'aria-label': 'נושאים' });
-    const refreshButton = h('button', { type: 'button', class: 'icon-btn refresh', title: 'רענון (F5)', onclick: () => refresh() }, icon('i-reload'));
-    const closeButton = h('button', { type: 'button', class: 'icon-btn', title: 'חזרה לערוצים (K או Esc)', onclick: () => setOpen(false) }, icon('i-close'));
+    // Keyboard hints only where there's a keyboard; embedded (Android), the view never closes.
+    const keys = text => (api.embedded ? '' : ` (${text})`);
+    const refreshButton = h('button', { type: 'button', class: 'icon-btn refresh', title: `רענון${keys('F5')}`, onclick: () => refresh() }, icon('i-reload'));
+    const closeButton = api.embedded ? null : h('button', { type: 'button', class: 'icon-btn', title: 'חזרה לערוצים (K או Esc)', onclick: () => setOpen(false) }, icon('i-close'));
     const main = h('div', { class: 'kn-main', tabindex: '-1' });
     const detail = h('aside', { class: 'kn-detail', hidden: true, 'aria-label': 'פרטים' });
     root.append(
@@ -380,6 +388,7 @@
         video.removeAttribute('src');
         video.load();
         api.silenceTv(false);
+        notifyBack();
       });
       return {
         element: dialog,
@@ -396,10 +405,26 @@
           }
           api.silenceTv(true);
           if (!dialog.open) dialog.showModal();
+          notifyBack();
           video.play().catch(() => {});
         },
       };
     })();
+
+    // Recordings play in the host's own player when it has one (Android), else in the dialog.
+    function playVideo(url, name) {
+      if (typeof api.playVideo === 'function') api.playVideo(url, name);
+      else player.play(url, name);
+    }
+
+    // Tells the host whether its back gesture has something here to close.
+    let backState = false;
+    function notifyBack() {
+      const value = !detail.hidden || player.element.open;
+      if (value === backState) return;
+      backState = value;
+      if (typeof api.onBackState === 'function') api.onBackState(value);
+    }
 
     function setOpen(open) {
       if (view.open === open) return;
@@ -413,7 +438,7 @@
         // The MKs and the government share the slowest data; it loads while you read.
         loadMembers().catch(() => {});
         view.refreshTimer = setInterval(() => {
-          if (view.tab === 'today' && !document.querySelector('dialog[open]')) render({ quiet: true });
+          if (view.tab === 'today' && !document.hidden && !document.querySelector('dialog[open]')) render({ quiet: true });
         }, TODAY_REFRESH_MS);
         main.focus({ preventScroll: true });
       } else {
@@ -441,6 +466,11 @@
       api.refreshChannels();
     }
 
+    // Back in sight after a while (another app or tab): today's page catches up at once.
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden && view.open && view.tab === 'today' && Date.now() - view.renderedAt > TODAY_REFRESH_MS) render({ quiet: true });
+    });
+
     async function renderSubtitle() {
       try {
         const knesset = await loadKnesset();
@@ -462,10 +492,12 @@
         if (token !== view.renderToken) return;
         const scroll = main.scrollTop;
         main.replaceChildren(content);
+        view.renderedAt = Date.now();
         if (quiet) main.scrollTop = scroll;
       } catch (error) {
         if (token !== view.renderToken) return;
-        if (!quiet) main.replaceChildren(problem(error, () => render({ force: true })));
+        // A quiet redraw keeps what's shown, unless that is still the loading message.
+        if (!quiet || main.querySelector(':scope > .kn-loading')) main.replaceChildren(problem(error, () => render({ force: true })));
       } finally {
         if (token === view.renderToken) refreshButton.classList.remove('is-busy');
       }
@@ -490,11 +522,12 @@
     async function openDetail(title, build) {
       detail.hidden = false;
       root.classList.add('has-detail');
+      notifyBack();
       const body = h('div', { class: 'kn-detail-body' }, loading('טוען…'));
       detail.replaceChildren(
         h('header', { class: 'kn-detail-header' },
           h('h3', null, title),
-          h('button', { type: 'button', class: 'icon-btn', title: 'סגירה (Esc)', onclick: closeDetail }, icon('i-close'))),
+          h('button', { type: 'button', class: 'icon-btn', title: `סגירה${keys('Esc')}`, onclick: closeDetail }, icon('i-close'))),
         body);
       const token = (detail.token = (detail.token || 0) + 1);
       try {
@@ -510,6 +543,7 @@
       detail.hidden = true;
       detail.token = (detail.token || 0) + 1;
       root.classList.remove('has-detail');
+      notifyBack();
     }
 
     /* Watching */
@@ -523,26 +557,24 @@
       }
     }
 
+    // A Knesset stream among the TV channels becomes the big one; the dashboard closes this view for it.
+    function openChannel(id) {
+      if (!api.embedded) setOpen(false);
+      api.watchChannel(id);
+    }
+
     // A live committee room that is among the TV channels opens there; anything else plays here.
     function watch(url, name) {
       const folder = streamFolder(url);
       const channel = api.knessetChannels().find(item => streamFolder(item.url) === folder);
-      if (channel) {
-        setOpen(false);
-        api.watchChannel(channel.id);
-      } else {
-        player.play(url, name);
-      }
+      if (channel) openChannel(channel.id);
+      else playVideo(url, name);
     }
 
     function watchPlenum() {
       const channel = api.knessetChannels().find(item => item.main);
-      if (channel) {
-        setOpen(false);
-        api.watchChannel(channel.id);
-      } else {
-        api.showToast('ערוץ הכנסת לא משדר כרגע');
-      }
+      if (channel) openChannel(channel.id);
+      else api.showToast('ערוץ הכנסת לא משדר כרגע');
     }
 
     /* ---------- Today ---------- */
@@ -582,7 +614,7 @@
             : h('p', { class: 'muted' }, 'סדר היום טרם פורסם'),
           h('div', { class: 'kn-card-actions' },
             stateClass === 'live' ? button('צפייה בשידור', () => openSession(session), 'kn-btn live') : null,
-            recording ? button('הקלטה', () => player.play(recording.broadcastUrl, `${name} · ${shortDate(start)}`), 'kn-btn') : null,
+            recording ? button('הקלטה', () => playVideo(recording.broadcastUrl, `${name} · ${shortDate(start)}`), 'kn-btn') : null,
             button('פרטים', () => openSession(session)),
             session.Location ? h('span', { class: 'kn-place muted' }, clean(session.Location)) : null)));
       return card;
@@ -625,10 +657,7 @@
         fragment.append(section('משודר עכשיו', h('div', { class: 'kn-live-row' },
           liveTopic ? h('button', { type: 'button', class: 'kn-live', onclick: watchPlenum }, h('i', { class: 'kn-dot' }), h('span', null, h('b', null, 'מליאה'), clean(liveTopic.Title))) : null,
           streams.filter(item => !(item.main && liveTopic)).map(item => h('button', {
-            type: 'button', class: 'kn-live', onclick: () => {
-              setOpen(false);
-              api.watchChannel(item.id);
-            },
+            type: 'button', class: 'kn-live', onclick: () => openChannel(item.id),
           }, h('i', { class: 'kn-dot' }), h('span', null, h('b', null, item.name), item.now || 'שידור חי'))))));
       }
 
@@ -697,7 +726,7 @@
           h('p', { class: 'muted' }, [clean(info && info.CommitteeLocation) || clean(session.Location), session.TypeDesc === 'חסויה' ? 'דיון חסוי – סגור לציבור ולא משודר' : 'דיון פתוח', session.StatusID === 193 ? 'הדיון בוטל' : ''].filter(Boolean).join(' · ')),
           live || archive ? h('div', { class: 'kn-card-actions' },
             live ? button('צפייה בשידור חי', () => watch(info.LiveUrlFeed, name), 'kn-btn live') : null,
-            archive ? button('צפייה בהקלטה', () => player.play(info.ArchiveUrlFeed, `${name} · ${shortDate(start)}`), 'kn-btn') : null) : null,
+            archive ? button('צפייה בהקלטה', () => playVideo(info.ArchiveUrlFeed, `${name} · ${shortDate(start)}`), 'kn-btn') : null) : null,
           section('על סדר היום', items.length ? h('ol', { class: 'kn-items' }, items.map(item => h('li', null, item.name, item.url ? externalLink(item.url, 'פרטים') : null))) : empty('סדר היום טרם פורסם.')),
           info && clean(info.Inviteds) ? section('מוזמנים', h('p', { class: 'kn-prose' }, plain(info.Inviteds))) : null,
           info && clean(info.SessionNotes) ? section('הערות', h('p', { class: 'kn-prose' }, plain(info.SessionNotes))) : null,
@@ -1010,7 +1039,7 @@
           clean(general.SummaryLaw) || clean(bill.SummaryLaw) ? section('תקציר החוק', h('p', { class: 'kn-prose' }, clean(general.SummaryLaw) || clean(bill.SummaryLaw))) : null,
           sessions.length ? section('הדרך עד כה', h('ol', { class: 'kn-path' }, sessions.map(step => h('li', null,
             h('b', null, `${clean(step.SessionDate)} `), clean(step.StepTitle), h('span', { class: 'muted' }, ` · ${clean(step.Location)}`),
-            step.BroadcastUrl ? button('הקלטה', () => player.play(step.BroadcastUrl, `${clean(step.Location)} · ${clean(step.SessionDate)}`), 'kn-btn small') : null,
+            step.BroadcastUrl ? button('הקלטה', () => playVideo(step.BroadcastUrl, `${clean(step.Location)} · ${clean(step.SessionDate)}`), 'kn-btn small') : null,
             step.ProtocolUrl ? externalLink(step.ProtocolUrl, 'פרוטוקול') : null)))) : null,
           docs.length ? section('מסמכים', h('ul', { class: 'kn-docs' }, docs.map(doc => h('li', null, externalLink(String(doc.FilePath || '').replace(/\\/g, '/'), clean(doc.FileText) || 'מסמך'))))) : null,
           externalLink(`${SITE}/apps/legislation/main/bills/${bill.Id}`, 'דף ההצעה במאגר החקיקה'));
@@ -1226,6 +1255,22 @@
       escape() {
         if (!detail.hidden) closeDetail();
         else setOpen(false);
+      },
+      // A phone's back gesture: closes the player, then the details; false when nothing was open.
+      back() {
+        if (player.element.open) {
+          player.element.close();
+          return true;
+        }
+        if (!detail.hidden) {
+          closeDetail();
+          return true;
+        }
+        return false;
+      },
+      // Redraws the open page from the data it has, for example when the live channels change.
+      rerender() {
+        if (view.open && !main.querySelector(':scope > .kn-loading')) render({ quiet: true });
       },
       // Exposed for tests.
       hebrewDate,

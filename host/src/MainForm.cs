@@ -16,18 +16,18 @@ using System.Windows.Forms;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.WinForms;
 
-namespace LocalTV;
+namespace NewsCenter;
 
 // A borderless window that hosts the dashboard. The page draws its own title bar and
 // window controls; this class keeps native behavior such as Snap, resizing and the taskbar.
 sealed class MainForm : Form
 {
-    const string AppHost = "localtv.example";
+    const string AppHost = "newscenter.example";
     const string AppOrigin = "https://" + AppHost;
     const int MaxFetchBytes = 4 * 1024 * 1024;
     const int MaxRedirects = 5;
 
-    // Sites Local TV never contacts: no page, frame, image, fetch, redirect or browser link.
+    // Sites News Center never contacts: no page, frame, image, fetch, redirect or browser link.
     static readonly string[] BlockedDomains = { "srugim.co.il" };
 
     static readonly HttpClient Http = CreateHttpClient();
@@ -51,8 +51,8 @@ sealed class MainForm : Form
     public MainForm(string appFolder, EventWaitHandle activateSignal)
     {
         this.appFolder = appFolder;
-        debug = int.TryParse(Environment.GetEnvironmentVariable("LOCALTV_DEBUG_PORT"), out var port) && port > 0;
-        Text = "Local TV";
+        debug = int.TryParse(Environment.GetEnvironmentVariable("NEWSCENTER_DEBUG_PORT"), out var port) && port > 0;
+        Text = "News Center";
         Icon = Program.AppIcon;
         BackColor = Color.FromArgb(7, 9, 13);
         FormBorderStyle = FormBorderStyle.Sizable;
@@ -248,7 +248,7 @@ sealed class MainForm : Form
             pageSaved = true;
             try
             {
-                await Task.WhenAny(view.CoreWebView2.ExecuteScriptAsync("window.localtv && window.localtv.flush()"), Task.Delay(1000));
+                await Task.WhenAny(view.CoreWebView2.ExecuteScriptAsync("window.newscenter && window.newscenter.flush()"), Task.Delay(1000));
             }
             catch (Exception error) when (error is InvalidOperationException or COMException)
             {
@@ -273,13 +273,13 @@ sealed class MainForm : Form
         catch (WebView2RuntimeNotFoundException)
         {
             MessageBox.Show(this,
-                "Local TV needs the Microsoft Edge WebView2 Runtime. Install it from https://go.microsoft.com/fwlink/p/?LinkId=2124703 and start Local TV again.",
-                "Local TV", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                "News Center needs the Microsoft Edge WebView2 Runtime. Install it from https://go.microsoft.com/fwlink/p/?LinkId=2124703 and start News Center again.",
+                "News Center", MessageBoxButtons.OK, MessageBoxIcon.Error);
             Close();
         }
         catch (Exception error)
         {
-            Program.ReportError("Local TV could not start", error);
+            Program.ReportError("News Center could not start", error);
             Close();
         }
     }
@@ -287,7 +287,7 @@ sealed class MainForm : Form
     async Task InitializeBrowserAsync()
     {
         var arguments = "--autoplay-policy=no-user-gesture-required --disable-features=HardwareMediaKeyHandling";
-        if (debug) arguments += " --remote-debugging-port=" + Environment.GetEnvironmentVariable("LOCALTV_DEBUG_PORT");
+        if (debug) arguments += " --remote-debugging-port=" + Environment.GetEnvironmentVariable("NEWSCENTER_DEBUG_PORT");
         var options = new CoreWebView2EnvironmentOptions(arguments);
         var environment = await CoreWebView2Environment.CreateAsync(null, Path.Combine(Program.DataFolder, "WebView2"), options);
         await view.EnsureCoreWebView2Async(environment);
@@ -323,7 +323,7 @@ sealed class MainForm : Form
         core.PermissionRequested += OnPermissionRequested;
         core.ContextMenuRequested += OnContextMenuRequested;
         core.ProcessFailed += OnProcessFailed;
-        core.DocumentTitleChanged += (_, _) => Text = string.IsNullOrWhiteSpace(core.DocumentTitle) ? "Local TV" : core.DocumentTitle;
+        core.DocumentTitleChanged += (_, _) => Text = string.IsNullOrWhiteSpace(core.DocumentTitle) ? "News Center" : core.DocumentTitle;
 
         // Runs in every frame; it only acts inside web pages that the dashboard shows as channels.
         var helper = Path.Combine(appFolder, "page-helper.js");
@@ -373,7 +373,7 @@ sealed class MainForm : Form
             var uri = HttpUri(url) ?? throw new ArgumentException("Only http and https addresses can be fetched.");
             for (var redirects = 0; ; redirects++)
             {
-                if (IsBlocked(uri.AbsoluteUri)) throw new ArgumentException("This site is blocked in Local TV.");
+                if (IsBlocked(uri.AbsoluteUri)) throw new ArgumentException("This site is blocked in News Center.");
                 using var request = new HttpRequestMessage(HttpMethod.Get, uri);
                 if (!string.IsNullOrEmpty(userAgent)) request.Headers.TryAddWithoutValidation("User-Agent", userAgent);
                 request.Headers.TryAddWithoutValidation("Accept", "text/html,application/xhtml+xml,application/rss+xml,application/atom+xml,application/xml;q=0.9,text/xml;q=0.9,application/json;q=0.9,*/*;q=0.8");
@@ -482,8 +482,8 @@ sealed class MainForm : Form
             case CoreWebView2ProcessFailedKind.BrowserProcessExited:
                 BeginInvoke(new Action(() =>
                 {
-                    MessageBox.Show(this, "The browser engine behind Local TV stopped. Start Local TV again to continue.",
-                        "Local TV", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    MessageBox.Show(this, "The browser engine behind News Center stopped. Start News Center again to continue.",
+                        "News Center", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     pageSaved = true;
                     Close();
                 }));

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Runs the release APK on an emulator before it's published. R8 removes code it thinks is unused,
 # and code that is only reached by reflection breaks only when the app runs. Opens the app, plays a
-# public test stream from a localtv:// link (always available, whatever is on air), visits every
+# public test stream from a newscenter:// link (always available, whatever is on air), visits every
 # tab and Settings, goes to the home screen, and fails if the app crashes or nothing plays. Crashes
 # are shown with the original names, decoded with the build's mapping file. Screenshots
 # (smoke-*.png) are published with the build.
@@ -10,7 +10,7 @@ set -u
 
 apk=$1
 mapping=$2
-pkg=io.github.eyalshimshi.localtv
+pkg=io.github.eyalshimshi.newscenter
 # A public test stream (its 512x288 rendition, light enough for an emulator), URL-encoded for the link:
 # https://test-streams.mux.dev/x36xhzz/url_4/193039199_mp4_h264_aac_7.m3u8
 test_stream="https%3A%2F%2Ftest-streams.mux.dev%2Fx36xhzz%2Furl_4%2F193039199_mp4_h264_aac_7.m3u8"
@@ -47,7 +47,7 @@ check_no_crash() {
   adb logcat -d -b crash > crash.txt
   if grep -q "Process: $pkg" crash.txt; then
     decode crash.txt
-    fail "Local TV crashed $1" decoded.txt
+    fail "News Center crashed $1" decoded.txt
   fi
 }
 
@@ -55,7 +55,7 @@ screenshot() {
   adb exec-out screencap -p > "smoke-$1.png" 2> /dev/null || true
 }
 
-# Writes the text on the screen and Local TV's own log to decoded.txt, with the original names.
+# Writes the text on the screen and News Center's own log to decoded.txt, with the original names.
 collect_diagnostics() {
   local pid
   pid=$(adb shell pidof "$pkg" | tr -d '\r')
@@ -63,20 +63,20 @@ collect_diagnostics() {
     echo "--- Text on the screen ---"
     timeout 30 adb shell uiautomator dump /sdcard/window.xml > /dev/null
     adb shell cat /sdcard/window.xml | grep -oE '(text|content-desc)="[^"]+"' | head -n 80
-    echo "--- Local TV's log ---"
-    adb logcat -d -s LocalTV:V | tail -n 60
+    echo "--- News Center's log ---"
+    adb logcat -d -s NewsCenter:V | tail -n 60
     if [ -n "$pid" ]; then adb logcat -d --pid="$pid" | tail -n 200; fi
   } > diagnostics.txt 2>&1
   screenshot failure
   decode diagnostics.txt
 }
 
-# Waits up to $2 seconds for Local TV's log to show $1.
+# Waits up to $2 seconds for News Center's log to show $1.
 wait_for_log() {
   local deadline=$((SECONDS + $2))
   while [ "$SECONDS" -lt "$deadline" ]; do
     check_no_crash "$3"
-    if adb logcat -d -s LocalTV:V | grep -q "$1"; then return 0; fi
+    if adb logcat -d -s NewsCenter:V | grep -q "$1"; then return 0; fi
     sleep 3
   done
   return 1
@@ -135,15 +135,15 @@ logcat_pid=$!
 monitor_pid=$!
 trap 'kill $logcat_pid $monitor_pid 2> /dev/null; { echo "--- Kernel messages ---"; sudo dmesg -T | tail -n 60; } >> host.txt 2>&1' EXIT
 
-echo "Opening Local TV"
+echo "Opening News Center"
 adb shell am start -W -n "$pkg/.MainActivity"
 sleep 15
 check_no_crash "while opening"
-adb shell pidof "$pkg" > /dev/null || fail "Local TV isn't running after opening it"
+adb shell pidof "$pkg" > /dev/null || fail "News Center isn't running after opening it"
 screenshot watch
 
-echo "Playing a test stream from a localtv:// link"
-adb shell "am start -W -a android.intent.action.VIEW -d 'localtv://play?url=$test_stream&name=Smoke%20test' -n $pkg/.MainActivity"
+echo "Playing a test stream from a newscenter:// link"
+adb shell "am start -W -a android.intent.action.VIEW -d 'newscenter://play?url=$test_stream&name=Smoke%20test' -n $pkg/.MainActivity"
 if ! wait_for_log "playing preview" 90 "while playing the test stream"; then
   collect_diagnostics
   fail "The test stream didn't start playing" decoded.txt
@@ -156,13 +156,42 @@ fi
 sleep 5
 screenshot spotlight
 
-for tab in Channels News Watch; do
+for tab in Channels News; do
   echo "Opening the $tab tab"
   must_tap text "$tab"
   sleep 6
   check_no_crash "on the $tab tab"
   screenshot "$(echo "$tab" | tr '[:upper:]' '[:lower:]')-tab"
 done
+
+# The Knesset tab: the shared Knesset view in a WebView, reading the Knesset's services through the
+# app. The page reports its first page to the app's log; the Knesset not answering is only a warning.
+echo "Opening the Knesset tab"
+must_tap text "Knesset"
+if wait_for_log 'knesset: page \(shown\|problem\)' 90 "on the Knesset tab"; then
+  problem=$(adb logcat -d -s NewsCenter:V | grep -m 1 'knesset: page problem' | sed 's/.*knesset: page problem: //')
+  if [ -n "$problem" ]; then
+    echo "::warning::The Knesset screen opened, but the Knesset's services didn't answer the emulator: $problem"
+  else
+    echo "The Knesset screen showed today's page"
+  fi
+else
+  collect_diagnostics
+  fail "The Knesset screen didn't show its page" decoded.txt
+fi
+if adb logcat -d -s NewsCenter:V | grep -q 'knesset page: Uncaught'; then
+  adb logcat -d -s NewsCenter:V | grep 'knesset page:' > knesset-errors.txt
+  fail "The Knesset screen has a script error" knesset-errors.txt
+fi
+sleep 4
+check_no_crash "on the Knesset tab"
+screenshot knesset-tab
+
+echo "Opening the Watch tab"
+must_tap text "Watch"
+sleep 6
+check_no_crash "on the Watch tab"
+screenshot watch-tab
 
 echo "Opening Settings"
 if tap content-desc "More options" && sleep 2 && tap text "Settings"; then
@@ -185,5 +214,5 @@ screenshot home
 # Stops the players so the emulator shuts down quickly.
 adb shell am force-stop "$pkg" || true
 
-echo "Smoke test passed: Local TV opened, played the test stream and showed every tab."
-echo "Smoke test passed: Local TV opened, played the test stream and showed every tab." >> "${GITHUB_STEP_SUMMARY:-/dev/null}"
+echo "Smoke test passed: News Center opened, played the test stream and showed every tab."
+echo "Smoke test passed: News Center opened, played the test stream and showed every tab." >> "${GITHUB_STEP_SUMMARY:-/dev/null}"

@@ -1,0 +1,46 @@
+<!doctype html>
+<!--
+  The Android app's Knesset screen: the Windows app's Knesset view (knesset.js, knesset-guide.js and
+  knesset.css, which the build copies here from app/) laid out for a phone. android.js connects it
+  to the app; KnessetWeb.kt loads this page and answers its requests.
+-->
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark light">
+  <title>הכנסת</title>
+  <link rel="stylesheet" href="knesset.css">
+  <link rel="stylesheet" href="android.css">
+  <script>
+    // The app's colors (Material roles such as surfaceContainer), set before anything is drawn:
+    // first from the page's address, later whenever the app's theme changes.
+    window.__ncApplyTheme = theme => {
+      if (!theme || typeof theme !== 'object') return;
+      const root = document.documentElement;
+      root.dataset.theme = theme.dark ? 'dark' : 'light';
+      root.style.colorScheme = theme.dark ? 'dark' : 'light';
+      for (const [name, value] of Object.entries(theme.colors || {})) {
+        if (/^[A-Za-z]+$/.test(name) && /^#[0-9A-Fa-f]{6}$/.test(value)) root.style.setProperty(`--m-${name}`, value);
+      }
+    };
+    try {
+      window.__ncApplyTheme(JSON.parse(new URLSearchParams(location.search).get('theme') || 'null'));
+    } catch {
+      // The built-in colors stay.
+    }
+  </script>
+</head>
+<body>
+  <svg class="sprite" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+    <symbol id="i-reload" viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.34-5.66"/><path d="M20 4v5h-5"/></symbol>
+    <symbol id="i-knesset" viewBox="0 0 24 24"><path d="M3 9.5 12 4l9 5.5"/><path d="M5 11v7M9.7 11v7M14.3 11v7M19 11v7"/><path d="M3 20.5h18"/></symbol>
+    <!-- On the phone the details' close button is a back arrow (it points right in Hebrew). -->
+    <symbol id="i-close" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></symbol>
+    <symbol id="i-external" viewBox="0 0 24 24"><path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></symbol>
+  </svg>
+  <script src="knesset-guide.js"></script>
+  <script src="knesset.js"></script>
+  <script src="android.js"></script>
+</body>
+</html>

@@ -1,0 +1,225 @@
+/*
+ * The Knesset screen on Android: the shared Knesset view (knesset.css) on a phone, in the app's own
+ * colors. KnessetScreen.kt passes the app's Material colors as --m-* variables (see index.html);
+ * the fallbacks are the app's default dark theme.
+ */
+
+:root {
+  --bg: var(--m-background, #121318);
+  --surface: var(--m-surfaceContainerLow, #1a1b21);
+  --surface-2: var(--m-surfaceContainer, #1e1f25);
+  --surface-3: var(--m-surfaceContainerHighest, #34343a);
+  --border: var(--m-outlineVariant, #45464f);
+  --border-strong: var(--m-outline, #8f909a);
+  --text: var(--m-onSurface, #e3e1e9);
+  --muted: var(--m-onSurfaceVariant, #c5c5d0);
+  --accent: var(--m-primary, #b9c3ff);
+  --live: #e5393f;
+  --ok: #4fbf7f;
+  --warn: #e9b949;
+  --danger: var(--m-error, #ffb4ab);
+  --mono: ui-monospace, "Roboto Mono", monospace;
+  --kn-font: system-ui, Roboto, "Noto Sans Hebrew", sans-serif;
+  --kn-header-bg: var(--bg);
+  --kn-text-2: var(--muted);
+  --kn-link: var(--accent);
+  --kn-accent-text: var(--accent);
+  --kn-accent-soft: var(--m-secondaryContainer, #414659);
+  --kn-on-accent-soft: var(--m-onSecondaryContainer, #dee1f9);
+  --kn-accent-mid: var(--m-primaryContainer, #384379);
+  --kn-on-accent-mid: var(--m-onPrimaryContainer, #dde1ff);
+  --kn-on-accent: var(--m-onPrimary, #212c61);
+  --kn-explain-bg: color-mix(in srgb, var(--accent) 10%, transparent);
+  --kn-live-text: #ff8a8f;
+  --kn-gold-text: #f2c94c;
+  --kn-for: #5fd38a;
+  --kn-against: #ff8a80;
+}
+:root[data-theme="light"] {
+  --live: #d32f2f;
+  --ok: #1e8e4e;
+  --warn: #9a6700;
+  --kn-live-text: #b3261e;
+  --kn-gold-text: #7a5900;
+  --kn-for: #1a7f37;
+  --kn-against: #c62828;
+}
+
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body {
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font: 14px/1.45 var(--kn-font);
+  -webkit-tap-highlight-color: transparent;
+  text-size-adjust: 100%;
+}
+button, input { font: inherit; color: inherit; }
+[hidden] { display: none !important; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.muted { color: var(--muted); }
+
+.sprite { position: absolute; width: 0; height: 0; overflow: hidden; }
+.icon {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* The page's few general controls, sized for fingers. */
+.icon-btn {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.icon-btn .icon { width: 22px; height: 22px; }
+.icon-btn.refresh.is-busy .icon { animation: spin 1s linear infinite; }
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 20px;
+  border: 1px solid var(--border-strong);
+  border-radius: 20px;
+  background: transparent;
+  color: var(--accent);
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.btn.primary { border-color: transparent; background: var(--accent); color: var(--kn-on-accent); }
+.btn.small { height: 36px; padding: 0 16px; font-size: 13px; }
+.chip {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--kn-text-2);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.chip[aria-pressed="true"] { border-color: transparent; background: var(--kn-accent-soft); color: var(--kn-on-accent-soft); }
+.chip-count { opacity: .75; font-size: 11.5px; font-variant-numeric: tabular-nums; }
+.check { display: inline-flex; align-items: center; gap: 10px; min-height: 40px; cursor: pointer; }
+.check input { width: 20px; height: 20px; margin: 0; accent-color: var(--accent); }
+.spinner {
+  display: none;
+  width: 30px;
+  height: 30px;
+  border: 3px solid var(--surface-3);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin .9s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes live-dot { 50% { opacity: .35; } }
+
+/* A pressed item darkens or lightens a little, like Material's state layer. */
+:is(.icon-btn, .btn, .chip, .kn-tab, .kn-btn, .kn-row-btn, .kn-live, .kn-tile, .kn-bill, .kn-mk, .kn-faction):active {
+  box-shadow: inset 0 0 0 100vmax color-mix(in srgb, var(--text) 10%, transparent);
+}
+
+/* ---------- The view on a phone ---------- */
+
+/* The view fills the screen: the title, the topics (sideways when they don't fit), then the page. */
+.kn { position: fixed; inset: 0; }
+.kn-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0;
+  padding: 0;
+}
+.kn-title { gap: 12px; padding: 12px 16px 2px; }
+.kn-logo { width: 28px; height: 28px; }
+.kn-title h2 { font-size: 20px; font-weight: 700; }
+.kn-sub { font-size: 12.5px; line-height: 1.4; }
+.kn-actions { align-self: start; padding: 6px 6px 0; }
+.kn-tabs {
+  grid-column: 1 / -1;
+  flex-wrap: nowrap;
+  gap: 8px;
+  padding: 10px 16px 12px;
+  overflow-x: auto;
+  scroll-padding-inline: 16px;
+  scrollbar-width: none;
+}
+.kn-tab { flex: none; padding: 7px 14px; border-color: var(--border); border-radius: 8px; }
+.kn-tab[aria-selected="true"] { border-color: transparent; }
+
+.kn-main, .kn-detail { overflow-wrap: anywhere; }
+.kn-main { padding: 14px 16px 40px; }
+.kn-page { gap: 24px; }
+.kn-section > h3 { font-size: 17px; }
+
+.kn-btn { height: 36px; padding: 0 14px; border-radius: 18px; font-size: 13.5px; }
+.kn-btn.small { height: 30px; padding: 0 11px; border-radius: 15px; font-size: 12.5px; }
+.kn-row-btn { padding: 10px 8px; }
+.kn-live { padding: 10px 14px; border-radius: 16px; }
+.kn-card, .kn-day, .kn-tile, .kn-bill, .kn-mk { border-radius: 16px; }
+.kn-card { gap: 12px; padding: 12px; }
+.kn-when { width: 46px; }
+.kn-when b { font: 700 16px/1 var(--kn-font); font-variant-numeric: tabular-nums; }
+
+.kn-search {
+  width: 100%;
+  height: 44px;
+  padding: 0 16px;
+  border-color: transparent;
+  border-radius: 22px;
+  background: var(--surface-2);
+  font-size: 15px;
+}
+.kn-search:focus { border-color: var(--accent); }
+
+/* Filters and factions scroll sideways instead of taking several rows. */
+.kn-chips, .kn-faction-list {
+  flex-wrap: nowrap;
+  margin-inline: -16px;
+  padding-inline: 16px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.kn-faction-list > li { flex: none; }
+.kn-faction { padding: 7px 12px; }
+
+.kn-glossary { grid-template-columns: 1fr; gap: 2px; }
+.kn-glossary dt { margin-top: 12px; }
+.kn-mk-grid { grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 8px; }
+.kn-photo { width: 72px; height: 72px; }
+.kn-mk-head img { width: 88px; height: 88px; }
+.kn-people { grid-template-columns: repeat(auto-fill, minmax(min(240px, 100%), 1fr)); }
+.kn-names { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+
+/* Details: a page of their own on a phone, a panel beside the list on a tablet. */
+.kn-detail-header { gap: 4px; padding: 4px 8px; }
+.kn-detail-header .icon-btn { order: -1; color: var(--text); }
+.kn-detail-header h3 { font-size: 17px; }
+.kn-detail-body { padding: 8px 16px 40px; }
+@media (max-width: 859px) {
+  .kn-detail { position: fixed; inset: 0; z-index: 5; width: auto; border: 0; background: var(--bg); }
+  .kn-detail-header { background: var(--bg); }
+}

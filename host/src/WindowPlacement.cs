@@ -6,9 +6,9 @@ using System.Linq;
 using System.Web.Script.Serialization;
 using System.Windows.Forms;
 
-namespace LocalTV;
+namespace NewsCenter;
 
-// Remembers where the window was, so Local TV reopens in the same place.
+// Remembers where the window was, so News Center reopens in the same place.
 static class WindowPlacement
 {
     static string FilePath => Path.Combine(Program.DataFolder, "window.json");

@@ -11,7 +11,7 @@
         tools:node="remove" />
 
     <application
-        android:name=".LocalTvApplication"
+        android:name=".NewsCenterApplication"
         android:allowBackup="false"
         android:enableOnBackInvokedCallback="true"
         android:icon="@mipmap/ic_launcher"
@@ -20,7 +20,7 @@
         android:networkSecurityConfig="@xml/network_security_config"
         android:roundIcon="@mipmap/ic_launcher"
         android:supportsRtl="true"
-        android:theme="@style/Theme.LocalTV">
+        android:theme="@style/Theme.NewsCenter">
 
         <!-- Handles rotation, picture-in-picture and window resizing itself, so the players and
              their pictures carry on without a restart. -->
@@ -35,14 +35,14 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-            <!-- localtv://play?url=<stream>&name=<title> previews a stream without saving it. -->
+            <!-- newscenter://play?url=<stream>&name=<title> previews a stream without saving it. -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data
                     android:host="play"
-                    android:scheme="localtv" />
+                    android:scheme="newscenter" />
             </intent-filter>
         </activity>
 

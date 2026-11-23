@@ -1,4 +1,4 @@
-# Maintaining Local TV
+# Maintaining News Center
 
 How the project is built, released, signed and kept working. For what the apps do, see
 [README.md](README.md); for why things are the way they are, see [SPEC.md](SPEC.md).
@@ -14,7 +14,7 @@ How the project is built, released, signed and kept working. For what the apps d
 | `app/` | The Windows app's dashboard (HTML/JS); `app/channels.js` and `app/news.js` are its built-in lists |
 | `app/knesset.js`, `app/knesset-guide.js` | The Windows app's Knesset view, and its Hebrew guide, glossary, bill stages and links |
 | `docs/knesset-data.md` | The Knesset's website and data services, as the Knesset view uses them: endpoints, codes, quirks. Start here when the Knesset changes something |
-| `host/` | The Windows app's window (C#, WebView2); `host\build.cmd` builds `LocalTV.exe` |
+| `host/` | The Windows app's window (C#, WebView2); `host\build.cmd` builds `NewsCenter.exe` |
 | `.github/workflows/build.yml` | CI: builds, tests and publishes both apps |
 | `.github/scripts/smoke-test.sh` | Runs the Android release APK on an emulator before anything is published |
 
@@ -26,7 +26,7 @@ Every push to `main` runs **Build** (`build.yml`):
 
 1. **android**: `gradle assembleRelease` (R8 on), `gradle testDebugUnitTest`, then a smoke test on
    an Android 14 emulator: open the app, play a public test stream from a
-   `localtv://play?url=…` link, open every tab and Settings, go to the home screen. Any crash fails
+   `newscenter://play?url=…` link, open every tab and Settings, go to the home screen. Any crash fails
    the job (decoded with the build's R8 mapping file). Screenshots are kept as `smoke-*.png`.
    The emulator draws with **Lavapipe** (`-gpu lavapipe`), its current software renderer: with
    the older SwiftShader modes the whole emulator froze and quit seconds after the test stream
@@ -38,10 +38,10 @@ Every push to `main` runs **Build** (`build.yml`):
    Every `adb` call has a time limit and the step stops after 20 minutes, so a frozen emulator
    can't hold the pipeline. The Israeli channels play from GitHub's servers too, so the
    screenshots show real channels.
-2. **desktop** (Windows): `host\build.cmd`, then `local-tv-windows-N.zip` (`LocalTV.exe`, `app/`,
+2. **desktop** (Windows): `host\build.cmd`, then `news-center-windows-N.zip` (`NewsCenter.exe`, `app/`,
    `DESKTOP.md` as `README.md`, `LICENSE`).
-3. **publish**: if the Android job passed, a **pre-release** named "Local TV build N" (tag
-   `build-N`) with `local-tv-N.apk`, `mapping-N.zip`, the Windows zip (if that job passed) and the
+3. **publish**: if the Android job passed, a **pre-release** named "News Center build N" (tag
+   `build-N`) with `news-center-N.apk`, `mapping-N.zip`, the Windows zip (if that job passed) and the
    smoke-test screenshots.
 
 Build errors and test failures are copied into the run's **Summary** page.
@@ -53,14 +53,14 @@ Build errors and test failures are copied into the run's **Summary** page.
    `git tag v1.0.1 && git push origin v1.0.1`.
 3. The tag build names the version after the tag (`versionName` 1.0.1; `versionCode` is always
    the run number, so every build installs over the previous one) and publishes a full release
-   with `local-tv-v1.0.1.apk`, `local-tv-windows-v1.0.1.zip` and `mapping-v1.0.1.zip`.
+   with `news-center-v1.0.1.apk`, `news-center-windows-v1.0.1.zip` and `mapping-v1.0.1.zip`.
 
 ### Signing
 
 Android only installs an update signed with the same key as the installed app.
 
 - **Now:** every build is signed with one key that CI creates once and keeps in the Actions cache
-  (`localtv-debug-keystore-v1`). The weekly scheduled run touches the cache so GitHub never evicts
+  (`newscenter-debug-keystore-v1`). The weekly scheduled run touches the cache so GitHub never evicts
   it (unused caches go after 7 days). If it is ever lost, the next build creates a new key and
   phones must uninstall once before installing it.
 - **Risk:** the repository is public, and Actions caches are not secrets: a workflow run from a
@@ -90,9 +90,9 @@ To regenerate the Android files from the Windows ones (Node.js):
 const fs = require('fs'), vm = require('vm');
 const load = (f, k) => { const s = { window: {} }; vm.runInNewContext(fs.readFileSync(f, 'utf8'), s); return s.window[k]; };
 const v = Number(new Date().toISOString().slice(0, 10).replace(/-/g, '') + '01');
-const channels = load('app/channels.js', 'LOCALTV_CHANNELS').map(({ id, name, description, kind, url, poster, enabled, auto }) =>
+const channels = load('app/channels.js', 'NEWSCENTER_CHANNELS').map(({ id, name, description, kind, url, poster, enabled, auto }) =>
   Object.fromEntries(Object.entries({ id, name, description, kind, url, poster, enabled, auto }).filter(([, x]) => x !== undefined && x !== '')));
-const sources = load('app/news.js', 'LOCALTV_NEWS');
+const sources = load('app/news.js', 'NEWSCENTER_NEWS');
 fs.writeFileSync('android/app/src/main/assets/channels.json', JSON.stringify({ catalogVersion: v, channels }, null, 2) + '\n');
 fs.writeFileSync('android/app/src/main/assets/news.json', JSON.stringify({ catalogVersion: v, sources }, null, 2) + '\n');
 '@ | node -

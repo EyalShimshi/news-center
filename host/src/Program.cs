@@ -12,23 +12,23 @@ using System.Threading;
 using System.Windows.Forms;
 
 [assembly: TargetFramework(".NETFramework,Version=v4.8", FrameworkDisplayName = ".NET Framework 4.8")]
-[assembly: AssemblyTitle("Local TV")]
-[assembly: AssemblyProduct("Local TV")]
+[assembly: AssemblyTitle("News Center")]
+[assembly: AssemblyProduct("News Center")]
 [assembly: AssemblyDescription("Multiview dashboard for live TV")]
 [assembly: AssemblyVersion("2.0.0.0")]
 [assembly: AssemblyFileVersion("2.0.0.0")]
 
-namespace LocalTV;
+namespace NewsCenter;
 
 static class Program
 {
-    const string InstanceName = @"Local\LocalTV.Instance";
-    const string ActivateEventName = @"Local\LocalTV.Activate";
+    const string InstanceName = @"Local\NewsCenter.Instance";
+    const string ActivateEventName = @"Local\NewsCenter.Activate";
 
     static readonly Dictionary<string, Assembly> embeddedAssemblies = new(StringComparer.OrdinalIgnoreCase);
 
     public static string DataFolder { get; } =
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "LocalTV");
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "NewsCenter");
 
     public static Icon AppIcon { get; private set; }
 
@@ -56,14 +56,14 @@ static class Program
         Application.EnableVisualStyles();
         Application.SetCompatibleTextRenderingDefault(false);
         Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
-        Application.ThreadException += (_, e) => ReportError("Local TV ran into a problem", e.Exception);
+        Application.ThreadException += (_, e) => ReportError("News Center ran into a problem", e.Exception);
 
         var appFolder = FindAppFolder();
         if (appFolder == null)
         {
             MessageBox.Show(
-                "Local TV could not find its \"app\" folder. Keep LocalTV.exe next to the app folder.",
-                "Local TV", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                "News Center could not find its \"app\" folder. Keep NewsCenter.exe next to the app folder.",
+                "News Center", MessageBoxButtons.OK, MessageBoxIcon.Error);
             return;
         }
 
@@ -75,7 +75,7 @@ static class Program
         }
         catch (Exception error)
         {
-            ReportError("Local TV could not start", error);
+            ReportError("News Center could not start", error);
         }
     }
 
@@ -116,7 +116,7 @@ static class Program
     // WebView2Loader.dll is native, so it is unpacked once to a versioned folder and loaded from there.
     static void PrepareWebView2Loader()
     {
-        var bytes = ReadResource("lib.WebView2Loader.dll") ?? throw new FileNotFoundException("WebView2Loader.dll is missing from LocalTV.exe.");
+        var bytes = ReadResource("lib.WebView2Loader.dll") ?? throw new FileNotFoundException("WebView2Loader.dll is missing from NewsCenter.exe.");
         string version;
         using (var sha = SHA256.Create())
         {
@@ -146,7 +146,7 @@ static class Program
 
     static Icon LoadIcon()
     {
-        using var stream = typeof(Program).Assembly.GetManifestResourceStream("LocalTV.ico");
+        using var stream = typeof(Program).Assembly.GetManifestResourceStream("NewsCenter.ico");
         return stream == null ? SystemIcons.Application : new Icon(stream);
     }
 

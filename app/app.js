@@ -1,8 +1,8 @@
-/* Local TV: a multiview dashboard for live TV. */
+/* News Center: a multiview dashboard for live TV. */
 (() => {
   'use strict';
 
-  const STORAGE_KEY = 'localtv.state.v2';
+  const STORAGE_KEY = 'newscenter.state.v2';
   const ASPECT = 16 / 9;
   const MIN_TILE_WIDTH = 200;
   const MAX_VOLUME = 2;
@@ -55,8 +55,8 @@
     unlisted: 'Not listed',
   };
 
-  const BUILTIN_CHANNELS = Array.isArray(window.LOCALTV_CHANNELS) ? window.LOCALTV_CHANNELS : [];
-  const BUILTIN_NEWS = Array.isArray(window.LOCALTV_NEWS) ? window.LOCALTV_NEWS : [];
+  const BUILTIN_CHANNELS = Array.isArray(window.NEWSCENTER_CHANNELS) ? window.NEWSCENTER_CHANNELS : [];
+  const BUILTIN_NEWS = Array.isArray(window.NEWSCENTER_NEWS) ? window.NEWSCENTER_NEWS : [];
 
   const $ = (selector, root = document) => root.querySelector(selector);
   const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -161,7 +161,7 @@
     }
   }
 
-  // Sites Local TV never contacts, whatever a saved source, a link or a redirect says.
+  // Sites News Center never contacts, whatever a saved source, a link or a redirect says.
   const BLOCKED_DOMAINS = ['srugim.co.il'];
 
   function isBlockedUrl(url) {
@@ -175,7 +175,7 @@
     return element;
   }
 
-  // Like the Local TV window does: the charset the server names, else the one the document
+  // Like the News Center window does: the charset the server names, else the one the document
   // declares (feeds such as <?xml encoding="windows-1255"?>), else UTF-8.
   function decodeBody(buffer, contentType) {
     const bytes = new Uint8Array(buffer);
@@ -193,9 +193,9 @@
     return '';
   }
 
-  /* ---------- Local TV window ---------- */
+  /* ---------- News Center window ---------- */
 
-  // Inside the Local TV window (WebView2) the host draws nothing itself: the page provides the
+  // Inside the News Center window (WebView2) the host draws nothing itself: the page provides the
   // window controls, and the host fetches pages that cross-site rules hide from a browser tab.
   const host = (() => {
     const webview = window.chrome && window.chrome.webview;
@@ -226,7 +226,7 @@
         listeners.set(type, [...(listeners.get(type) || []), listener]);
       },
       async fetchText(url) {
-        if (isBlockedUrl(url)) throw new Error('this site is blocked in Local TV');
+        if (isBlockedUrl(url)) throw new Error('this site is blocked in News Center');
         if (!webview) {
           const response = await fetch(url, { cache: 'no-store' });
           const text = decodeBody(await response.arrayBuffer(), response.headers.get('content-type'));
@@ -276,7 +276,7 @@
       now: cleanText(raw.now, 300),
       volume: Number.isFinite(raw.volume) ? clamp(raw.volume, 0, maxVolume(kind)) : 1,
       meter: raw.meter !== false,
-      // Every channel starts muted each time Local TV opens.
+      // Every channel starts muted each time News Center opens.
       muted: true,
       soloed: false,
     };
@@ -440,7 +440,7 @@
       const channels = state.channels.map(({ muted, soloed, ...channel }) => channel);
       localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...state, channels }));
     } catch (error) {
-      console.warn('Local TV could not save its settings.', error);
+      console.warn('News Center could not save its settings.', error);
     }
   }
 
@@ -1029,27 +1029,27 @@
 
     sendSound() {
       const target = this.frame.contentWindow;
-      if (target) target.postMessage({ localtv: 'audio', muted: this.sound.muted, volume: this.sound.volume }, '*');
+      if (target) target.postMessage({ newscenter: 'audio', muted: this.sound.muted, volume: this.sound.volume }, '*');
     }
 
     receive(data) {
-      if (data.localtv === 'hello') {
+      if (data.newscenter === 'hello') {
         this.sendSound();
-      } else if (data.localtv === 'page-status') {
+      } else if (data.newscenter === 'page-status') {
         this.setStatus(data.playing ? 'live' : 'web');
-      } else if (data.localtv === 'levels' && Array.isArray(data.levels)) {
+      } else if (data.newscenter === 'levels' && Array.isArray(data.levels)) {
         this.levels = data.levels.slice(0, 2).map(value => clamp(Number(value) || 0, 0, 1));
         this.levelsAt = performance.now();
-      } else if (data.localtv === 'pointer') {
+      } else if (data.newscenter === 'pointer') {
         selectChannel(this.channel.id);
         markActive();
-      } else if (data.localtv === 'hover' || data.localtv === 'hover-end') {
+      } else if (data.newscenter === 'hover' || data.newscenter === 'hover-end') {
         // Like a video player's controls, the tile's buttons hide when the pointer rests.
         clearTimeout(this.hoverTimer);
-        const hovered = data.localtv === 'hover';
+        const hovered = data.newscenter === 'hover';
         this.el.classList.toggle('is-hovered', hovered);
         if (hovered) this.hoverTimer = setTimeout(() => this.el.classList.remove('is-hovered'), PAGE_HOVER_MS);
-      } else if (data.localtv === 'key' && typeof data.code === 'string') {
+      } else if (data.newscenter === 'key' && typeof data.code === 'string') {
         handleShortcut({ code: data.code, shiftKey: Boolean(data.shiftKey) });
       }
     }
@@ -1087,7 +1087,7 @@
 
   window.addEventListener('message', event => {
     const data = event.data;
-    if (!data || typeof data !== 'object' || typeof data.localtv !== 'string') return;
+    if (!data || typeof data !== 'object' || typeof data.newscenter !== 'string') return;
     for (const tile of tiles.values()) {
       if (tile.kind === 'page' && tile.frame.contentWindow === event.source) {
         tile.receive(data);
@@ -1836,7 +1836,7 @@
   let idleTimer = 0;
   let revealTimer = 0;
 
-  // Fills the Local TV window with one channel; the monitor and the window size stay as they are.
+  // Fills the News Center window with one channel; the monitor and the window size stay as they are.
   function setFullscreen(id) {
     const next = id && tiles.has(id) ? id : null;
     if (next === fullscreenId) return;
@@ -2059,7 +2059,7 @@
     if (offAir) parts.push(`${offAir} off air`);
     const text = parts.join(' · ');
     if (dom.summary.textContent !== text) dom.summary.textContent = text;
-    const title = live ? `Local TV · ${live} live` : 'Local TV';
+    const title = live ? `News Center · ${live} live` : 'News Center';
     if (document.title !== title) document.title = title;
   }
 
@@ -2318,7 +2318,7 @@
     dom.testRow.hidden = !isStream;
     fields.url.placeholder = isStream
       ? 'https://example.com/live/playlist.m3u8\nYou can also paste an embed <iframe> code or a watch.knesset.tv link.'
-      : 'https://broadcaster.example/live\nThe page plays in its tile, showing just its video player when Local TV can find it.';
+      : 'https://broadcaster.example/live\nThe page plays in its tile, showing just its video player when News Center can find it.';
   }
 
   // Accepts a stream address, an <iframe> embed code, or a player link that carries the stream
@@ -2364,7 +2364,7 @@
         return ['On air', 'ok'];
       }
     }
-    if (result.availability === 'offline') return [`Not broadcasting right now (${result.detail}). Local TV keeps checking once it's added.`, 'warn'];
+    if (result.availability === 'offline') return [`Not broadcasting right now (${result.detail}). News Center keeps checking once it's added.`, 'warn'];
     return ['Could not load it. The server may be offline or may not allow other apps to play it.', 'error'];
   }
 
@@ -2403,7 +2403,7 @@
       const poster = fields.poster.value.trim();
       if (!name) return invalid(fields.name, 'Enter a channel name.');
       if (!isHttpUrl(url)) return invalid(fields.url, 'Enter an http:// or https:// address.');
-      if (isBlockedUrl(url)) return invalid(fields.url, 'This site is blocked in Local TV.');
+      if (isBlockedUrl(url)) return invalid(fields.url, 'This site is blocked in News Center.');
       if (poster && !isHttpUrl(poster)) return invalid(fields.poster, 'Enter an http:// or https:// image address, or leave it empty.');
 
       const values = { name, description: fields.description.value.trim(), kind, url, poster, enabled: fields.enabled.checked };
@@ -2437,14 +2437,14 @@
 
   function exportChannels() {
     const data = {
-      app: 'Local TV',
+      app: 'News Center',
       version: 2,
       exportedAt: new Date().toISOString(),
       channels: state.channels.map(({ id, name, description, kind, url, poster, enabled, auto }) => ({ id, name, description, kind, url, poster, enabled, auto })),
     };
     const link = document.createElement('a');
     link.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }));
-    link.download = `localtv-channels-${new Date().toISOString().slice(0, 10)}.json`;
+    link.download = `newscenter-channels-${new Date().toISOString().slice(0, 10)}.json`;
     document.body.append(link);
     link.click();
     link.remove();
@@ -3239,7 +3239,7 @@
         return;
       }
       if (isBlockedUrl(address)) {
-        setFeedback(dom.sourceTestResult, 'This site is blocked in Local TV.', 'error');
+        setFeedback(dom.sourceTestResult, 'This site is blocked in News Center.', 'error');
         return;
       }
       const test = ++sourceTest;
@@ -3264,7 +3264,7 @@
       const url = dom.sourceUrl.value.trim();
       const name = dom.sourceName.value.trim();
       if (!isHttpUrl(url)) return invalid(dom.sourceUrl, 'Enter an http:// or https:// address.');
-      if (isBlockedUrl(url)) return invalid(dom.sourceUrl, 'This site is blocked in Local TV.');
+      if (isBlockedUrl(url)) return invalid(dom.sourceUrl, 'This site is blocked in News Center.');
       if (!name) return invalid(dom.sourceName, 'Enter a name, or press Test feed to use the feed\'s own.');
       const existing = editingSourceId ? findSource(editingSourceId) : null;
       const duplicate = existing ? null : state.news.sources.find(source => source.url === url);
@@ -3543,7 +3543,7 @@
     revealTile(id);
   }
 
-  const knesset = typeof window.LocalTVKnesset === 'function' ? window.LocalTVKnesset({
+  const knesset = typeof window.NewsCenterKnesset === 'function' ? window.NewsCenterKnesset({
     fetchText: url => host.fetchText(url),
     showToast: message => showToast(message),
     knessetChannels: () => state.channels.filter(channel => channel.auto === 'knesset' && channel.kind === 'stream').map(channel => ({
@@ -3586,8 +3586,8 @@
     setInterval(() => runDiscovery(), DISCOVERY_INTERVAL_MS);
   }
 
-  // Lets the Local TV window save settings right before it closes.
-  window.localtv = { flush: writeState };
+  // Lets the News Center window save settings right before it closes.
+  window.newscenter = { flush: writeState };
 
   audio.init();
   document.body.classList.toggle('no-meters', !audio.ctx);

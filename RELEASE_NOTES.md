@@ -1,8 +1,8 @@
-## Local TV 1.1.0
+## News Center 1.1.0
 
 The Windows app gets a **Knesset view**; both apps stop using one news site.
 
-### Windows (`local-tv-windows-v1.1.0.zip`)
+### Windows (`news-center-windows-v1.1.0.zip`)
 
 - **Knesset** in the title bar (or `K`): a full-window view, in Hebrew, of the Knesset's
   day-to-day work, straight from the Knesset's own data:
@@ -19,10 +19,10 @@ The Windows app gets a **Knesset view**; both apps stop using one news site.
   - Live sessions open in the grid as the big channel; recordings play in place.
 - One news site was removed from the sources and is blocked everywhere in the window.
 
-Unzip and run `LocalTV.exe` (Windows 10 or 11). See
-[DESKTOP.md](https://github.com/EyalShimshi/local-tv/blob/main/DESKTOP.md).
+Unzip and run `NewsCenter.exe` (Windows 10 or 11). See
+[DESKTOP.md](https://github.com/EyalShimshi/news-center/blob/main/DESKTOP.md).
 
-### Android (`local-tv-v1.1.0.apk`, Android 12 or newer)
+### Android (`news-center-v1.1.0.apk`, Android 12 or newer)
 
 - One news site was removed from the sources and is blocked: no feed, channel, link or web page
   request goes to it.

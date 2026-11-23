@@ -1,19 +1,19 @@
 /*
- * Local TV page-channel helper (Android), adapted from the desktop app's app/page-helper.js.
+ * News Center page-channel helper (Android), adapted from the desktop app's app/page-helper.js.
  *
- * Local TV injects this script into every frame of a web-page channel (Channel 12's Mako page).
+ * News Center injects this script into every frame of a web-page channel (Channel 12's Mako page).
  *   - Every video and audio element, including ads and nested frames, follows the app's mute and
  *     volume, so the tile's M and S buttons work like for any other channel. Everything starts
  *     muted until the app says otherwise.
  *   - The page itself shows just its video player, filling the tile.
- * The app calls window.localtvAudio(muted, volume), window.localtvPause() and
- * window.localtvResume() on the page.
+ * The app calls window.newscenterAudio(muted, volume), window.newscenterPause() and
+ * window.newscenterResume() on the page.
  */
 (() => {
   'use strict';
 
-  if (window.__localtvHelper) return;
-  window.__localtvHelper = true;
+  if (window.__newscenterHelper) return;
+  window.__newscenterHelper = true;
 
   const PLAYER_SELECTORS = '.video-js, .jwplayer, .shaka-video-container, .plyr, .bitmovinplayer-container, .theoplayer-container';
   const isChannelPage = window.top === window;
@@ -34,7 +34,7 @@
     document.querySelectorAll('video, audio').forEach(follow);
     for (const frame of document.querySelectorAll('iframe')) {
       try {
-        frame.contentWindow.postMessage({ localtvRelay: { muted: desired.muted, volume: desired.volume } }, '*');
+        frame.contentWindow.postMessage({ newscenterRelay: { muted: desired.muted, volume: desired.volume } }, '*');
       } catch (error) {
         // The frame may be gone already.
       }
@@ -63,7 +63,7 @@
   window.addEventListener('message', event => {
     const data = event.data;
     if (isChannelPage || event.source !== window.parent || !data || typeof data !== 'object') return;
-    const next = data.localtvRelay;
+    const next = data.newscenterRelay;
     if (next && typeof next === 'object') setDesired(next.muted, next.volume);
   });
 
@@ -71,8 +71,8 @@
 
   if (!isChannelPage) return;
 
-  window.localtvAudio = setDesired;
-  window.localtvPause = () => {
+  window.newscenterAudio = setDesired;
+  window.newscenterPause = () => {
     document.querySelectorAll('video, audio').forEach(element => {
       try {
         element.pause();
@@ -81,7 +81,7 @@
       }
     });
   };
-  window.localtvResume = () => {
+  window.newscenterResume = () => {
     const video = mainVideo();
     if (video && video.paused) video.play().catch(() => {});
   };
@@ -94,7 +94,7 @@
   const ISOLATE_CSS = `
     html, body { overflow: hidden !important; background: #000 !important; }
     body { visibility: hidden !important; }
-    [data-localtv-player] {
+    [data-newscenter-player] {
       visibility: visible !important;
       position: fixed !important;
       inset: 0 !important;
@@ -110,7 +110,7 @@
       background: #000 !important;
     }
     :is(${PROMPT_SELECTORS}) { visibility: visible !important; z-index: 2147483647 !important; }
-    [data-localtv-ancestor] {
+    [data-newscenter-ancestor] {
       transform: none !important;
       filter: none !important;
       perspective: none !important;
@@ -160,12 +160,12 @@
     if (player && player.isConnected) return;
     const next = findPlayer();
     if (!next) return;
-    document.querySelectorAll('[data-localtv-ancestor]').forEach(element => element.removeAttribute('data-localtv-ancestor'));
-    if (player) player.removeAttribute('data-localtv-player');
+    document.querySelectorAll('[data-newscenter-ancestor]').forEach(element => element.removeAttribute('data-newscenter-ancestor'));
+    if (player) player.removeAttribute('data-newscenter-player');
     player = next;
-    player.setAttribute('data-localtv-player', '');
+    player.setAttribute('data-newscenter-player', '');
     for (let element = player.parentElement; element && element !== document.documentElement; element = element.parentElement) {
-      element.setAttribute('data-localtv-ancestor', '');
+      element.setAttribute('data-newscenter-ancestor', '');
     }
     if (!style || !style.isConnected) {
       style = document.createElement('style');

@@ -1,6 +1,6 @@
 # Privacy
 
-Local TV (for Android and for Windows) has no accounts, no ads, no analytics and no tracking. It
+News Center (for Android and for Windows) has no accounts, no ads, no analytics and no tracking. It
 doesn't collect, sell or share personal data.
 
 ## What it connects to
@@ -29,4 +29,4 @@ That's all: no location, contacts, storage, microphone or notifications.
 
 ## Contact
 
-Open an issue at <https://github.com/EyalShimshi/local-tv/issues>.
+Open an issue at <https://github.com/EyalShimshi/news-center/issues>.

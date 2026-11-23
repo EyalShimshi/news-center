@@ -1,4 +1,4 @@
-# Local TV for Windows
+# News Center for Windows
 
 > This is the guide to the Windows app. The Android app, downloads and an overview of both are in
 > [README.md](README.md).
@@ -11,13 +11,13 @@ that explains the Knesset's day in plain Hebrew.
 
 ## Start
 
-Download `local-tv-windows-….zip` from the [latest release](https://github.com/EyalShimshi/local-tv/releases/latest),
-unzip it anywhere and double-click `LocalTV.exe` (or build it yourself with `host\build.cmd`). It needs Windows 10 or 11 with the Microsoft Edge
+Download `news-center-windows-….zip` from the [latest release](https://github.com/EyalShimshi/news-center/releases/latest),
+unzip it anywhere and double-click `NewsCenter.exe` (or build it yourself with `host\build.cmd`). It needs Windows 10 or 11 with the Microsoft Edge
 WebView2 Runtime and .NET Framework 4.8, both of which are part of Windows 11.
 Starting it again while it is open brings the existing window forward.
 
 Settings, the window position and the browser cache are kept in
-`%LOCALAPPDATA%\LocalTV`.
+`%LOCALAPPDATA%\NewsCenter`.
 
 ## The window
 
@@ -49,10 +49,10 @@ channel manager (`C`):
 | Makan 33 (Arabic) | Kan's live stream |
 | Channel 9 (Russian) | Channel 9's live stream |
 
-Channels added to Local TV in an update appear next to the channel listed before
+Channels added to News Center in an update appear next to the channel listed before
 them above, even if you have rearranged your channels.
 
-Local TV reads [knesset.tv/live](https://www.knesset.tv/live/) every time it
+News Center reads [knesset.tv/live](https://www.knesset.tv/live/) every time it
 starts, every five minutes, and whenever you refresh. New committee streams are
 added by themselves. Entries that knesset.tv hides are ignored.
 
@@ -98,7 +98,7 @@ Axios, France 24, DW and Euronews.
 page when the page names its feed. **Test feed** checks it and fills in its name.
 If a network's web filter blocks a site, its row in the list says so.
 
-Some sites are blocked in Local TV altogether (the list is `BLOCKED_DOMAINS` in
+Some sites are blocked in News Center altogether (the list is `BLOCKED_DOMAINS` in
 `app/app.js` and `BlockedDomains` in `host/src/MainForm.cs`): they can't be added
 as a source or a channel, saved ones are dropped, and the window refuses every
 request to them – pages, frames, feeds, redirects and links.
@@ -132,7 +132,7 @@ TV uses them is in [docs/knesset-data.md](docs/knesset-data.md).
 
 ## Sound
 
-- Every channel starts muted each time Local TV opens.
+- Every channel starts muted each time News Center opens.
 - **Spotlight + solo**: point at a channel and press the round button in its
   middle (or select it and press `Enter`). The channel becomes the big one in
   Spotlight and the only one you hear; every other channel is muted. Press the
@@ -151,7 +151,7 @@ TV uses them is in [docs/knesset-data.md](docs/knesset-data.md).
 - Meters show each channel's level even while it is muted. To hide a channel's
   meter, point at the channel and press the small button next to the meter (or
   select it and press `V`). `Shift`+`V` hides every meter, or shows them all again.
-  Local TV remembers which meters are hidden.
+  News Center remembers which meters are hidden.
 
 ## Layout
 
@@ -174,7 +174,7 @@ TV uses them is in [docs/knesset-data.md](docs/knesset-data.md).
 
 ## Fullscreen
 
-`F`, double-clicking a channel, or its fullscreen button fills the Local TV
+`F`, double-clicking a channel, or its fullscreen button fills the News Center
 window with that channel; the window keeps its size and position. Move the
 mouse to the top edge to bring back the title bar, press `1`–`9` or `←` `→` to
 switch channels, and press `Esc` to return to the grid. Meters are hidden in
@@ -212,7 +212,7 @@ remove channels. A channel can be:
 - a **live stream**: paste an HLS address (`.m3u8`), an embed `<iframe>` code, or
   a `watch.knesset.tv` link, and the stream address is extracted automatically.
   **Test stream** checks it before you save.
-- a **web page with its own player**: it plays inside its tile, and Local TV shows
+- a **web page with its own player**: it plays inside its tile, and News Center shows
   just the page's video player when it can find it.
 
 Removed built-in and Knesset channels don't come back by themselves; **Reset**
@@ -225,15 +225,15 @@ channel list as JSON. To ship a channel with the project, add it to
 
 | Path | Contents |
 | --- | --- |
-| `LocalTV.exe` | The app window (built from `host/`) |
+| `NewsCenter.exe` | The app window (built from `host/`) |
 | `app/` | The dashboard: `index.html`, `styles.css`, `app.js`, `channels.js` (built-in channels), `news.js` (built-in news sources) |
 | `app/knesset.js`, `app/knesset-guide.js` | The Knesset view, and its Hebrew guide, glossary, bill stages and links |
 | `app/page-helper.js` | Runs inside web-page channels (sound, player-only view, meter) |
 | `host/src/` | C# source of the window |
-| `host/build.cmd` | Rebuilds `LocalTV.exe`; downloads the C# compiler and WebView2 SDK from nuget.org on first use |
-| `host/make-icon.mjs` | Regenerates `host/LocalTV.ico` from `app/icon.svg` (needs Node.js) |
+| `host/build.cmd` | Rebuilds `NewsCenter.exe`; downloads the C# compiler and WebView2 SDK from nuget.org on first use |
+| `host/make-icon.mjs` | Regenerates `host/NewsCenter.ico` from `app/icon.svg` (needs Node.js) |
 
-Changes in `app/` take effect the next time Local TV starts; changes in `host/`
+Changes in `app/` take effect the next time News Center starts; changes in `host/`
 need `host\build.cmd`.
 
 [hls.js](https://github.com/video-dev/hls.js) 1.7.4 (Apache-2.0) is included in

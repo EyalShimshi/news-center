@@ -10,9 +10,9 @@
  *   enabled  true switches the source on for people who haven't chosen yet
  *
  * Sources are switched on and off in the channel manager's News tab, where any other RSS or
- * Atom feed can be added too. New built-in sources appear the next time Local TV starts.
+ * Atom feed can be added too. New built-in sources appear the next time News Center starts.
  */
-window.LOCALTV_NEWS = [
+window.NEWSCENTER_NEWS = [
   { id: 'ynet-flash', name: 'ynet · מבזקים', lang: 'he', color: '#ff4d4d', enabled: true, url: 'https://www.ynet.co.il/Integration/StoryRss1854.xml' },
   { id: 'n12', name: 'N12', lang: 'he', color: '#4f8cff', enabled: true, url: 'https://rcs.mako.co.il/rss/31750a2610f26110VgnVCM1000005201000aRCRD.xml' },
   { id: 'maariv-flash', name: 'מעריב · מבזקים', lang: 'he', color: '#f5a524', enabled: true, url: 'https://www.maariv.co.il/rss/rssfeedsmivzakichadashot' },

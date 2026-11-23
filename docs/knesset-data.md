@@ -1,4 +1,4 @@
-# The Knesset's website and data, as Local TV uses them
+# The Knesset's website and data, as News Center uses them
 
 A map of what the Knesset publishes and how to read it, made for the Knesset view in the Windows
 app (round 2). Everything here was checked against the live services in November 2026, in the
@@ -7,7 +7,7 @@ first days of the 26th Knesset.
 ## Two official data sources
 
 Both answer plain HTTPS requests; neither sends CORS headers, so the Windows app reads them
-through its host's fetch bridge (`window.localtv.fetchText`).
+through its host's fetch bridge (`window.newscenter.fetchText`).
 
 | | Open data (OData v4) | The website's own API |
 |---|---|---|
@@ -19,7 +19,7 @@ through its host's fetch bridge (`window.localtv.fetchText`).
 The website itself (`main.knesset.gov.il`) answers non-browser requests with HTTP 247 and a
 JavaScript bot check (Radware); repeated automated page loads get held at the check. Its static
 files, `fs.knesset.gov.il` documents, `video.knesset.gov.il` recordings and both APIs are not
-behind the check. Local TV never loads the website's pages; it only links to them.
+behind the check. News Center never loads the website's pages; it only links to them.
 
 ### Open data: the tables that matter
 
@@ -54,7 +54,7 @@ committee's request, 177 stopped.
 Requests to avoid (they return 500, or a WAF "access denied" 473): `Entity(key)?$expand=…`, and
 `$expand` with nested options on large tables. Flat `$filter` queries are fast; `in (…)` works.
 
-### The website's API: endpoints Local TV uses (all GET)
+### The website's API: endpoints News Center uses (all GET)
 
 | Endpoint | Gives |
 |---|---|

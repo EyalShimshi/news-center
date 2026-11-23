@@ -1,14 +1,14 @@
-# Local TV
+# News Center
 
 Israeli live TV in one multiview screen, with a mixer: watch several channels side by side, hear
-exactly the ones you want, and follow the news next to them. Local TV comes as an **Android app**
+exactly the ones you want, and follow the news next to them. News Center comes as an **Android app**
 and a **Windows app**, with the same channels, the same sound rules and the same news sources.
 
 [עברית למטה](#עברית)
 
 | | Android | Windows |
 |---|---|---|
-| Download | [`local-tv-….apk`](https://github.com/EyalShimshi/local-tv/releases/latest) (Android 12 or newer) | [`local-tv-windows-….zip`](https://github.com/EyalShimshi/local-tv/releases/latest) (Windows 10 or 11) |
+| Download | [`news-center-….apk`](https://github.com/EyalShimshi/news-center/releases/latest) (Android 12 or newer) | [`news-center-windows-….zip`](https://github.com/EyalShimshi/news-center/releases/latest) (Windows 10 or 11) |
 | Guide | [below](#the-android-app) | [DESKTOP.md](DESKTOP.md) |
 | Source | [`android/`](android) (Kotlin, Jetpack Compose, Media3) | [`app/`](app) and [`host/`](host) (HTML/JS in WebView2, C#) |
 
@@ -38,13 +38,13 @@ they go live.
 
 ### Install
 
-1. On your phone, open the [latest release](https://github.com/EyalShimshi/local-tv/releases/latest)
-   and tap `local-tv-v….apk`. Allow your browser to install apps if Android asks.
-2. Open **Local TV**. Every channel starts muted.
+1. On your phone, open the [latest release](https://github.com/EyalShimshi/news-center/releases/latest)
+   and tap `news-center-v….apk`. Allow your browser to install apps if Android asks.
+2. Open **News Center**. Every channel starts muted.
 
-Updates: install the newer APK over the old one, or add `https://github.com/EyalShimshi/local-tv`
+Updates: install the newer APK over the old one, or add `https://github.com/EyalShimshi/news-center`
 to [Obtainium](https://obtainium.imranr.dev/) to be told about new versions. Every change to the
-code also produces a development build (a pre-release named "Local TV build N").
+code also produces a development build (a pre-release named "News Center build N").
 
 ### Watch
 
@@ -61,7 +61,7 @@ code also produces a development build (a pre-release named "Local TV build N").
   all from the ⋮ menu or Settings, or one channel's from its edit dialog.
 - **Rearrange**: long-press a tile and drag it. The order is the same as in Channels.
 - **Fullscreen** (⛶ on the big channel): the phone turns sideways, ⏮ ⏭ switch channels and the
-  sound follows. In split screen it fills just Local TV's window.
+  sound follows. In split screen it fills just News Center's window.
 - **Picture-in-picture**: leave the app while a channel is in the spotlight and it keeps playing in
   a small window. Channels you can hear keep playing while you read the News tab.
 - **Refresh** (↻) looks for new Knesset broadcasts, checks every channel and reloads them.
@@ -93,7 +93,7 @@ network's web filter blocks a site, its row says so.
 Mako's streams only play in Mako's own player, so the Channel 12 tile shows Mako's live page with
 everything but the player hidden (the same approach as the Windows app). Its M and S work like on
 any channel; its volume stops at 100%, and it has no level meter, fullscreen or
-picture-in-picture. In the grid the tile responds to Local TV's taps; in the spotlight you can use
+picture-in-picture. In the grid the tile responds to News Center's taps; in the spotlight you can use
 Mako's own player (for example to close a pop-up or press play).
 
 ### Settings
@@ -120,7 +120,7 @@ your device. See [PRIVACY.md](PRIVACY.md).
 
 ## Disclaimer
 
-Local TV is an independent, unofficial app. It isn't affiliated with the Knesset, Kan, Keshet,
+News Center is an independent, unofficial app. It isn't affiliated with the Knesset, Kan, Keshet,
 Reshet, Channel 14, Channel 16, TV10, i24NEWS, Channel 9 or any news site. It plays the
 broadcasters' own public live streams and pages and opens articles on their own sites. Some
 streams are only available in Israel.
@@ -149,11 +149,11 @@ Icons (Apache-2.0).
 
 ## עברית
 
-**Local TV** – כל ערוצי הטלוויזיה החיים בישראל במסך אחד, עם מיקסר: רואים כמה ערוצים זה לצד זה,
+**News Center** – כל ערוצי הטלוויזיה החיים בישראל במסך אחד, עם מיקסר: רואים כמה ערוצים זה לצד זה,
 שומעים בדיוק את מה שרוצים, ועוקבים אחרי החדשות לצידם. יש אפליקציה לאנדרואיד ואפליקציה ל־Windows.
 
-**התקנה באנדרואיד:** פותחים בטלפון את [הגרסה האחרונה](https://github.com/EyalShimshi/local-tv/releases/latest)
-ומקישים על הקובץ `local-tv-v….apk` (אנדרואיד 12 ומעלה). כל הערוצים מתחילים מושתקים.
+**התקנה באנדרואיד:** פותחים בטלפון את [הגרסה האחרונה](https://github.com/EyalShimshi/news-center/releases/latest)
+ומקישים על הקובץ `news-center-v….apk` (אנדרואיד 12 ומעלה). כל הערוצים מתחילים מושתקים.
 
 - **ערוצים:** כאן 11, קשת 12 (בנגן של mako), רשת 13, עכשיו 14, ערוץ 16, ערוץ 10, i24NEWS וערוץ הכנסת.
   ועדות הכנסת ושידורים מיוחדים נמצאים אוטומטית ב־knesset.tv בכל פתיחה, כל חמש דקות ובכל רענון.

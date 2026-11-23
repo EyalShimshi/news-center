@@ -45,18 +45,18 @@ and the two data services behind it.
   layer, sources, channels, headline links and the web-page channel); the list is
   `BLOCKED_DOMAINS`. Your own copy already had it removed, so it wasn't being contacted. My old
   probe files and temporary files are deleted, the DNS cache holds nothing for it, and a stale
-  script cache in Local TV's data folder is deleted; your saved settings drop the old "removed"
-  entry the next time Local TV starts.
+  script cache in News Center's data folder is deleted; your saved settings drop the old "removed"
+  entry the next time News Center starts.
 
 **Fixed** – nothing (new section).
 
-**To ship** – pushed to `main` and released as `v1.1.0`. LocalTV.exe was rebuilt in the project
+**To ship** – pushed to `main` and released as `v1.1.0`. NewsCenter.exe was rebuilt in the project
 folder but not started.
 
 **To test**
 
 1. Press `K`: the Knesset view opens on **היום** with today's sessions.
-2. **צפייה בשידור** on a live session: Local TV goes back to the channels with it big and alone.
+2. **צפייה בשידור** on a live session: News Center goes back to the channels with it big and alone.
 3. **הקלטה** on a past session: the recording plays over the view; closing it brings the sound back.
 4. **ועדות** → a committee: members, staff, sessions; a session → invitees, agenda, documents.
 5. **חקיקה**: filter by stage, search a word, open a bill and read where it stands.
@@ -99,4 +99,4 @@ folder but not started.
 ## Status
 
 Pushed to `main` with build `v1.1.0` released; see the
-[releases](https://github.com/EyalShimshi/local-tv/releases).
+[releases](https://github.com/EyalShimshi/news-center/releases).

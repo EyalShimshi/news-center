@@ -3,16 +3,16 @@
 ## The request
 
 > can we make this into a mobile app? follow the way we made apps like the shidur app in
-> U:\radio-app. upload the app to https://github.com/EyalShimshi/local-tv which is a new repo for
+> U:\radio-app. upload the app to https://github.com/EyalShimshi/news-center which is a new repo for
 > this thing. i'm going out of office so no questions. put your final result including your answer
 > to this prompt in that repo, and make an installable apk available there as a release. thank you!
 
 ## The answer
 
-Yes – Local TV is now an Android app as well as a Windows app, built the Shidur way (native
+Yes – News Center is now an Android app as well as a Windows app, built the Shidur way (native
 Kotlin, Jetpack Compose, Material 3, Media3; GitHub Actions builds, tests on an emulator and
 publishes; the docs are the project's memory). Everything is in this repository, and the APK is
-in the [releases](https://github.com/EyalShimshi/local-tv/releases/latest).
+in the [releases](https://github.com/EyalShimshi/news-center/releases/latest).
 
 **What's new**
 
@@ -37,9 +37,9 @@ in the [releases](https://github.com/EyalShimshi/local-tv/releases/latest).
 
 **To test**
 
-1. On the phone, open the [latest release](https://github.com/EyalShimshi/local-tv/releases/latest)
-   and install `local-tv-v1.0.0.apk` (allow installs from the browser if asked).
-2. Open Local TV: after "Checking which channels are on air…" the live channels appear in two
+1. On the phone, open the [latest release](https://github.com/EyalShimshi/news-center/releases/latest)
+   and install `news-center-v1.0.0.apk` (allow installs from the browser if asked).
+2. Open News Center: after "Checking which channels are on air…" the live channels appear in two
    columns, all muted (red **M**), each with a green level meter.
 3. Tap Kan 11: it becomes the big channel and you hear only it. Tap Channel 13: the sound moves.
 4. Press **S** on two tiles: you hear both. Press **M** on one of them: it goes quiet.
@@ -72,7 +72,7 @@ in the [releases](https://github.com/EyalShimshi/local-tv/releases/latest).
   other. Before sharing the app widely, move to a release key (MAINTAINING.md → Signing; one
   uninstall needed then), and set Actions → "Require approval for all external contributors".
 - Playback stops when you leave the app (except picture-in-picture).
-- To keep the Windows app's folder working, the repository root *is* the Windows app; `LocalTV.exe`
+- To keep the Windows app's folder working, the repository root *is* the Windows app; `NewsCenter.exe`
   itself isn't committed (CI builds it into the release zip).
 
 **Next options**
@@ -93,14 +93,14 @@ decision log (every choice made without asking) and the architecture.
 
 ## Status
 
-- Released as **[Local TV v1.0.0](https://github.com/EyalShimshi/local-tv/releases/tag/v1.0.0)**:
-  `local-tv-v1.0.0.apk` (Android 12 or newer), `local-tv-windows-v1.0.0.zip` (the Windows app)
+- Released as **[News Center v1.0.0](https://github.com/EyalShimshi/news-center/releases/tag/v1.0.0)**:
+  `news-center-v1.0.0.apk` (Android 12 or newer), `news-center-windows-v1.0.0.zip` (the Windows app)
   and `mapping-v1.0.0.zip` (decodes crash reports from this version).
 - Every build passes the same checks before anything is published: the R8-shrunk release build,
   the unit tests (channel catalog, Knesset discovery, feed parsing, the M/S mixer rules, stream and
   news helpers, the built-in lists), and the emulator test – install, live channels in the grid, a
   test stream in the spotlight with its sound and meters, the Channels, News and Watch tabs,
-  Settings, and picture-in-picture on the home screen. Each development build ("Local TV build N"
+  Settings, and picture-in-picture on the home screen. Each development build ("News Center build N"
   in Releases) carries that run's screenshots.
 - In the emulator (in the US): Kan 11, Reshet 13, Now 14, Channel 16 and i24NEWS played in their
   tiles; Channel 12 showed Mako's page for viewers abroad (from Israel that page has the live

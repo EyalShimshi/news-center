@@ -1,7 +1,7 @@
 /*
- * Local TV page-channel helper.
+ * News Center page-channel helper.
  *
- * The Local TV window injects this script into every frame. It does nothing unless the frame
+ * The News Center window injects this script into every frame. It does nothing unless the frame
  * belongs to a web page that the dashboard shows as a channel. There it:
  *   - follows the dashboard's mute and volume for every video and audio element, including
  *     ads and nested frames, so the tile's M and S buttons work like for any other channel;
@@ -11,7 +11,7 @@
 (() => {
   'use strict';
 
-  const APP_ORIGIN = 'https://localtv.example';
+  const APP_ORIGIN = 'https://newscenter.example';
   const PLAYER_SELECTORS = '.video-js, .jwplayer, .shaka-video-container, .plyr, .bitmovinplayer-container, .theoplayer-container';
 
   if (window.top === window) return;
@@ -37,7 +37,7 @@
     document.querySelectorAll('video, audio').forEach(follow);
     for (const frame of document.querySelectorAll('iframe')) {
       try {
-        frame.contentWindow.postMessage({ localtvRelay: { muted: desired.muted, volume: desired.volume } }, '*');
+        frame.contentWindow.postMessage({ newscenterRelay: { muted: desired.muted, volume: desired.volume } }, '*');
       } catch {
         // The frame may be gone already.
       }
@@ -60,12 +60,12 @@
     const data = event.data;
     if (!data || typeof data !== 'object') return;
     if (event.source !== window.parent) {
-      if (typeof data.localtvUp === 'string' && isChildFrame(event.source)) reportPointer(data.localtvUp);
+      if (typeof data.newscenterUp === 'string' && isChildFrame(event.source)) reportPointer(data.newscenterUp);
       return;
     }
     let next = null;
-    if (isChannelPage && event.origin === APP_ORIGIN && data.localtv === 'audio') next = data;
-    else if (!isChannelPage && data.localtvRelay && typeof data.localtvRelay === 'object') next = data.localtvRelay;
+    if (isChannelPage && event.origin === APP_ORIGIN && data.newscenter === 'audio') next = data;
+    else if (!isChannelPage && data.newscenterRelay && typeof data.newscenterRelay === 'object') next = data.newscenterRelay;
     if (!next) return;
     desired.muted = Boolean(next.muted);
     desired.volume = Math.min(1, Math.max(0, Number(next.volume) || 0));
@@ -86,8 +86,8 @@
       if (now - lastHover < 250) return;
       lastHover = now;
     }
-    if (isChannelPage) window.parent.postMessage({ localtv: kind }, APP_ORIGIN);
-    else window.parent.postMessage({ localtvUp: kind }, '*');
+    if (isChannelPage) window.parent.postMessage({ newscenter: kind }, APP_ORIGIN);
+    else window.parent.postMessage({ newscenterUp: kind }, '*');
   }
 
   function isChildFrame(source) {
@@ -128,7 +128,7 @@
   window.addEventListener('pointerout', event => {
     if (event.relatedTarget) return;
     lastHover = 0;
-    tell({ localtv: 'hover-end' });
+    tell({ newscenter: 'hover-end' });
   }, true);
 
   /* ---------- Dashboard shortcuts ---------- */
@@ -150,7 +150,7 @@
     if (!shortcut || (event.code === 'Slash' && !event.shiftKey)) return;
     event.preventDefault();
     event.stopImmediatePropagation();
-    tell({ localtv: 'key', code: event.code, shiftKey: event.shiftKey });
+    tell({ newscenter: 'key', code: event.code, shiftKey: event.shiftKey });
   }, true);
 
   /* ---------- Player only ---------- */
@@ -161,7 +161,7 @@
   const ISOLATE_CSS = `
     html, body { overflow: hidden !important; background: #000 !important; }
     body { visibility: hidden !important; }
-    [data-localtv-player] {
+    [data-newscenter-player] {
       visibility: visible !important;
       position: fixed !important;
       inset: 0 !important;
@@ -177,7 +177,7 @@
       background: #000 !important;
     }
     :is(${PROMPT_SELECTORS}) { visibility: visible !important; z-index: 2147483647 !important; }
-    [data-localtv-ancestor] {
+    [data-newscenter-ancestor] {
       transform: none !important;
       filter: none !important;
       perspective: none !important;
@@ -223,12 +223,12 @@
     if (player && player.isConnected) return;
     const next = findPlayer();
     if (!next) return;
-    document.querySelectorAll('[data-localtv-ancestor]').forEach(element => element.removeAttribute('data-localtv-ancestor'));
-    if (player) player.removeAttribute('data-localtv-player');
+    document.querySelectorAll('[data-newscenter-ancestor]').forEach(element => element.removeAttribute('data-newscenter-ancestor'));
+    if (player) player.removeAttribute('data-newscenter-player');
     player = next;
-    player.setAttribute('data-localtv-player', '');
+    player.setAttribute('data-newscenter-player', '');
     for (let element = player.parentElement; element && element !== document.documentElement; element = element.parentElement) {
-      element.setAttribute('data-localtv-ancestor', '');
+      element.setAttribute('data-newscenter-ancestor', '');
     }
     if (!style || !style.isConnected) {
       style = document.createElement('style');
@@ -279,7 +279,7 @@
     const isPlaying = Boolean(video && !video.paused && video.readyState > 2);
     if (isPlaying !== playing) {
       playing = isPlaying;
-      tell({ localtv: 'page-status', playing });
+      tell({ newscenter: 'page-status', playing });
     }
     if (isPlaying) tap(video);
   }
@@ -295,7 +295,7 @@
       }
       return peak;
     });
-    tell({ localtv: 'levels', levels });
+    tell({ newscenter: 'levels', levels });
   }
 
   const start = () => {
@@ -309,5 +309,5 @@
     report();
   }, 1000);
   setInterval(measure, 80);
-  tell({ localtv: 'hello' });
+  tell({ newscenter: 'hello' });
 })();

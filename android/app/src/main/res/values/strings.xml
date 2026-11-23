@@ -1,11 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Local TV</string>
+    <string name="app_name">News Center</string>
 
     <!-- Tabs -->
     <string name="nav_watch">Watch</string>
     <string name="nav_channels">Channels</string>
     <string name="nav_news">News</string>
+    <string name="nav_knesset">Knesset</string>
+
+    <!-- Knesset (the screen itself is in Hebrew, like the Knesset's own services) -->
+    <string name="knesset_not_on_air">This broadcast isn\'t on air right now</string>
+    <string name="action_close_recording">Close the recording</string>
+    <string name="recording_error">The recording can\'t be played right now</string>
 
     <!-- Watch -->
     <string name="watch_checking">Checking which channels are on air…</string>
@@ -78,13 +84,13 @@
     <string name="field_stream_address">Stream address</string>
     <string name="field_page_address">Web page address</string>
     <string name="field_stream_hint">An HLS address (.m3u8), an embed &lt;iframe&gt; code, or a watch.knesset.tv link</string>
-    <string name="field_page_hint">The page plays in its tile, showing just its video player when Local TV can find it.</string>
+    <string name="field_page_hint">The page plays in its tile, showing just its video player when News Center can find it.</string>
     <string name="address_invalid">Enter a valid address</string>
     <string name="field_description">Description (optional)</string>
     <string name="action_test_stream">Test stream</string>
     <string name="test_live">On air</string>
     <string name="test_live_quality">On air, up to %1$dp</string>
-    <string name="test_off_air">Not broadcasting right now (%1$s). Local TV keeps checking once it\'s added.</string>
+    <string name="test_off_air">Not broadcasting right now (%1$s). News Center keeps checking once it\'s added.</string>
     <string name="test_failed">Couldn\'t load it. The server may be offline or may not let other apps play it.</string>
     <string name="field_meter">Show the level meter</string>
     <string name="page_channel_note" formatted="false">Web pages play in the spotlight and grid only (not fullscreen or picture-in-picture), and their volume stops at 100%.</string>
@@ -191,20 +197,20 @@
     <string name="language_hebrew">עברית</string>
     <string name="language_english">English</string>
     <string name="settings_about">About</string>
-    <string name="about_version">Local TV %1$s</string>
+    <string name="about_version">News Center %1$s</string>
     <string name="about_license">Free and open source (GPL-3.0) · source code on GitHub</string>
     <string name="about_updates">Updates</string>
     <string name="about_updates_summary">New versions are published on GitHub</string>
     <string name="about_privacy">Privacy</string>
     <string name="about_privacy_summary">No accounts, no ads, no tracking</string>
     <string name="action_report">Report a problem</string>
-    <string name="about_disclaimer">Local TV is an independent app, not affiliated with the Knesset, Kan, Keshet, Reshet, Channel 14, Channel 16, TV10, i24NEWS, Channel 9 or any news site. It plays the broadcasters\' own public live streams and pages, and opens articles on their own sites.</string>
+    <string name="about_disclaimer">News Center is an independent app, not affiliated with the Knesset, Kan, Keshet, Reshet, Channel 14, Channel 16, TV10, i24NEWS, Channel 9 or any news site. It plays the broadcasters\' own public live streams and pages, and opens articles on their own sites.</string>
     <string name="copied">Copied</string>
     <string name="no_browser">No app can open this link</string>
 
     <!-- Crash report -->
-    <string name="crash_title">Local TV stopped</string>
-    <string name="crash_body">Local TV closed unexpectedly last time. You can copy the details, or send them as a GitHub issue to help fix it.</string>
+    <string name="crash_title">News Center stopped</string>
+    <string name="crash_body">News Center closed unexpectedly last time. You can copy the details, or send them as a GitHub issue to help fix it.</string>
     <string name="crash_copy">Copy details</string>
     <string name="crash_report">Report</string>
     <string name="action_dismiss">Dismiss</string>

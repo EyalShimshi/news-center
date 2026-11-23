@@ -1,4 +1,4 @@
-# Local TV – specification and decisions
+# News Center – specification and decisions
 
 The memory of the project: what was asked, what was decided and why, and how it's built. Read it
 before changing behavior. User-facing documentation is in [README.md](README.md) and
@@ -48,7 +48,7 @@ revisited.
 |---|---|---|
 | D-01 | One repository for both apps: the Windows app stays at the root (`app/`, `host/`), Android in `android/` | The Windows app keeps working from the same folder; one place for issues, releases and docs |
 | D-02 | Native Kotlin + Compose + Material 3 + Media3 ExoPlayer, the Shidur toolchain (AGP 9.2.1, Kotlin 2.3.21, Gradle 9.5.0, compileSdk 37, minSdk 31) | Proven to build in CI with the same pipeline; native players handle several HLS streams better than a WebView, and allow real level meters and boost |
-| D-03 | Package `io.github.eyalshimshi.localtv`, name "Local TV", English and Hebrew, GPL-3.0-or-later | Same conventions as Shidur |
+| D-03 | Package `io.github.eyalshimshi.newscenter`, name "News Center", English and Hebrew, GPL-3.0-or-later | Same conventions as Shidur |
 | D-04 | One ExoPlayer per channel on screen; players start muted; the app holds one audio focus for all of them | Several players asking for focus would pause each other |
 | D-05 | Grid tiles capped at 480p, the spotlight/fullscreen channel unlimited (setting, on by default) | Phones have a limited number of video decoders, data and battery |
 | D-06 | Level meter and boost in a Media3 audio processor in each player's audio path, measuring before the volume | Same behavior as the desktop (a muted channel still shows activity) without the RECORD_AUDIO permission a Visualizer would need |
@@ -56,15 +56,15 @@ revisited.
 | D-08 | Channel 12 = Mako's live page in a WebView with a desktop User-Agent, showing only the player; `page-helper.js` is injected into every frame (androidx.webkit document-start scripts) and follows M/S | Mako's streams play only in Mako's player (as found for the desktop); every frame so that a player inside an iframe still starts muted |
 | D-09 | Knesset discovery, stream checks, merge rules, feed parsing and mixer rules ported 1:1 from `app/app.js` into plain Kotlin with unit tests | Both apps behave the same; the rules are testable without Android |
 | D-10 | jsoup for knesset.tv and for feeds (its XML parser is forgiving), plus the desktop's regex fallback for broken feeds; the server's or document's charset, else UTF-8 | Israeli feeds include windows-1255 and imperfect XML |
-| D-11 | Streams and pages are requested with the phone's own WebView User-Agent | Sites treat Local TV like the browser on the same phone |
+| D-11 | Streams and pages are requested with the phone's own WebView User-Agent | Sites treat News Center like the browser on the same phone |
 | D-12 | Dark theme by default; Material 3 with a blue accent from the icon, wallpaper colors optional | Video looks best on dark; the desktop app is dark |
 | D-13 | Bottom navigation: Watch, Channels, News; Settings from the menus; a navigation rail on wide screens | Three daily tasks, one tap each |
 | D-14 | Signing with a key created by CI and kept in the Actions cache, the same for every build; a workflow to create a release key later | An installable APK now, with updates installing over each other; see MAINTAINING.md for the public-repo cache risk |
 | D-15 | Every push: build, unit tests, emulator smoke test with a public test stream, then a pre-release; a `v*` tag makes the full release; the Windows app is built in the same run and attached | Nothing is published unless the shrunk APK actually runs; a public test stream is always available, whatever is on air |
-| D-16 | `localtv://play?url=…&name=…` previews a stream in the spotlight without saving it | Lets the smoke test (and anyone) open a stream directly, without adding channels from outside the app |
+| D-16 | `newscenter://play?url=…&name=…` previews a stream in the spotlight without saving it | Lets the smoke test (and anyone) open a stream directly, without adding channels from outside the app |
 | D-17 | Smoke-test screenshots are attached to pre-releases | The owner (and the agent) can see each build's UI without a device |
 | D-18 | Version 1.0.0 for the first Android release; development builds are 1.0-dev.N | Feature parity with the desktop app |
-| D-19 | The emulator in CI draws with Lavapipe (`-gpu lavapipe`, the emulator's current software renderer), and the test plays a 512×288 stream | With the deprecated SwiftShader modes the whole emulated phone froze, then the emulator quit, seconds after the test stream started next to the live channels (builds 2–5; the phone's log shows the app running normally until everything stopped). An experiment across eight setups ([run 1](https://github.com/EyalShimshi/local-tv/actions/runs/44158250899), [repeat](https://github.com/EyalShimshi/local-tv/actions/runs/44160119649)): on Android 14, `swiftshader_indirect`, `swiftshader` and `software` froze; `lavapipe` and `swangle` passed 4 of 4. An emulator problem, not the app's |
+| D-19 | The emulator in CI draws with Lavapipe (`-gpu lavapipe`, the emulator's current software renderer), and the test plays a 512×288 stream | With the deprecated SwiftShader modes the whole emulated phone froze, then the emulator quit, seconds after the test stream started next to the live channels (builds 2–5; the phone's log shows the app running normally until everything stopped). An experiment across eight setups ([run 1](https://github.com/EyalShimshi/news-center/actions/runs/44158250899), [repeat](https://github.com/EyalShimshi/news-center/actions/runs/44160119649)): on Android 14, `swiftshader_indirect`, `swiftshader` and `software` froze; `lavapipe` and `swangle` passed 4 of 4. An emulator problem, not the app's |
 | D-20 | The Knesset view is a full-window view in Hebrew (right-to-left) that covers the channels while they keep playing | The owner's choice (round 2): the Knesset's data is in Hebrew, and the view needs the whole window |
 | D-21 | The Knesset view reads the Knesset's open data (OData v4) and its website's own data service, never the website's pages | Both answer plain requests; the pages sit behind a bot check that holds automated visitors (seen during the scan), so the view only links to them |
 | D-22 | Blocked sites are a list in code (`BLOCKED_DOMAINS` in `app/app.js` and `data/Text.kt`, `BlockedDomains` in `host/src/MainForm.cs`), enforced at every layer; docs don't repeat the names | The owner asked that one site never be contacted; one layer missing (a redirect, a frame, a link) would break that |
@@ -72,9 +72,9 @@ revisited.
 ## 4. Architecture (Android)
 
 ```
-MainActivity ── LocalTvApp (Compose: Watch · Channels · News · Settings, fullscreen, PiP)
+MainActivity ── NewsCenterApp (Compose: Watch · Channels · News · Settings, fullscreen, PiP)
       │                 │
-      └── LocalTvViewModel ──────────────┬── ChannelStore (prefs) ← assets/channels.json
+      └── NewsCenterViewModel ──────────────┬── ChannelStore (prefs) ← assets/channels.json
             │  availability, mix,        ├── NewsController ── NewsStore (prefs) ← assets/news.json
             │  spotlight/fullscreen      ├── KnessetDiscovery ── Http (HttpURLConnection) ── jsoup
             │                            ├── StreamCheck (is the playlist live?)

@@ -1,5 +1,5 @@
 /*
- * Built-in Local TV channels.
+ * Built-in News Center channels.
  *
  * Add a channel by appending an object to this list:
  *   id           unique, stable identifier
@@ -11,15 +11,15 @@
  *   poster       optional image shown while connecting
  *   enabled      false keeps the channel off screen until it is switched on
  *                in the channel manager
- *   auto         "knesset" marks the Knesset Channel, which Local TV keeps in sync
+ *   auto         "knesset" marks the Knesset Channel, which News Center keeps in sync
  *                with knesset.tv. The Knesset's other live streams (committees and
  *                special broadcasts) are found automatically and need no entry here.
  *
- * New built-in channels appear the next time Local TV starts, right after the channel
+ * New built-in channels appear the next time News Center starts, right after the channel
  * listed before them here. Channels added or edited in the app are saved in the app's
  * settings, not in this file.
  */
-window.LOCALTV_CHANNELS = [
+window.NEWSCENTER_CHANNELS = [
   {
     id: 'kan11',
     name: 'כאן 11',
