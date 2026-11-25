@@ -138,7 +138,7 @@ button, input { font: inherit; color: inherit; }
 @keyframes live-dot { 50% { opacity: .35; } }
 
 /* A pressed item darkens or lightens a little, like Material's state layer. */
-:is(.icon-btn, .btn, .chip, .kn-tab, .kn-btn, .kn-row-btn, .kn-live, .kn-tile, .kn-bill, .kn-mk, .kn-faction):active {
+:is(.icon-btn, .btn, .chip, .kn-tab, .kn-btn, .kn-row-btn, .kn-live, .kn-tile, .kn-bill, .kn-mk, .kn-faction, .kn-cal-day, .kn-more-btn):active {
   box-shadow: inset 0 0 0 100vmax color-mix(in srgb, var(--text) 10%, transparent);
 }
 
@@ -181,10 +181,12 @@ button, input { font: inherit; color: inherit; }
 .kn-btn.small { height: 30px; padding: 0 11px; border-radius: 15px; font-size: 12.5px; }
 .kn-row-btn { padding: 10px 8px; }
 .kn-live { padding: 10px 14px; border-radius: 16px; }
-.kn-card, .kn-day, .kn-tile, .kn-bill, .kn-mk { border-radius: 16px; }
+.kn-card, .kn-day, .kn-tile, .kn-bill, .kn-mk, .kn-item, .kn-now { border-radius: 16px; }
 .kn-card { gap: 12px; padding: 12px; }
 .kn-when { width: 46px; }
 .kn-when b { font: 700 16px/1 var(--kn-font); font-variant-numeric: tabular-nums; }
+.kn-more-btn { padding: 8px 0; }
+.kn-cal-move { width: 44px; height: 40px; border-radius: 20px; }
 
 .kn-search {
   width: 100%;

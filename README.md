@@ -17,7 +17,8 @@ How the Android app was made, what's in version 1.0.0 and how to try it:
 [docs/rounds/01-android-app.md](docs/rounds/01-android-app.md). The Knesset view:
 [docs/rounds/02-knesset-view.md](docs/rounds/02-knesset-view.md) (Windows) and
 [docs/rounds/03-news-center.md](docs/rounds/03-news-center.md) (Android, and the new name). A
-channel in its own window: [docs/rounds/04-own-windows.md](docs/rounds/04-own-windows.md).
+channel in its own window: [docs/rounds/04-own-windows.md](docs/rounds/04-own-windows.md). The
+plenum's full agenda and the calendar: [docs/rounds/05-agenda-and-calendar.md](docs/rounds/05-agenda-and-calendar.md).
 
 ## Channels
 
@@ -102,9 +103,14 @@ the Windows app, laid out for a phone and in the app's colors:
 
 - **היום** (Today): what's on air now, today's plenum and committee sessions with their agendas,
   the next plenum sitting and the week ahead in the committees.
-- **ועדות** (Committees), **מליאה** (Plenum), **הצבעות** (Votes) and **חקיקה** (Legislation): every
-  committee with its members and sessions, the sittings, every vote and how each MK voted, every
-  bill with its stage in plain words.
+- **לוח שנה** (Calendar): a month at a glance – the plenum's sittings, how many committee sessions
+  each day has, holidays and recess. Tap a day for its sitting and sessions.
+- **מליאה** (Plenum): the sitting's full agenda as the Knesset publishes it – every item with its
+  summary (תקציר), initiators, **בתמיכת הממשלה** when the government supports it, who presents it
+  and who answers, documents, votes and speakers. While the plenum sits: what's being discussed, who
+  is speaking and who's next. Arrows move between sittings.
+- **ועדות** (Committees), **הצבעות** (Votes) and **חקיקה** (Legislation): every committee with its
+  members and sessions, every vote and how each MK voted, every bill with its stage in plain words.
 - **חברי הכנסת** (MKs) and **ממשלה** (Government): all 120 MKs (who's in the building now) and the
   government. **מדריך** (Guide): how the Knesset works, with a glossary.
 
@@ -132,11 +138,12 @@ a News panel beside or below the channels, keyboard shortcuts for everything, an
 the window. Any channel can move out to **a window of its own** (`D`) – on another monitor, or kept
 on top of other apps – and its sound still follows the mixer. **Knesset** (`K`) opens a
 full-window view, in Hebrew, of the Knesset's day-to-day work: what's on air and on the agenda
-today, every committee with its members and sessions, plenum sittings, every vote and how each MK
-voted, bills with their stage in plain words, all 120 MKs (who's in the building now), the
-government, and a guide with a glossary. Live sessions open in the grid and recordings play in
-place. See [DESKTOP.md](DESKTOP.md) and, for the Knesset's data,
-[docs/knesset-data.md](docs/knesset-data.md).
+today, a calendar of the month, every committee with its members and sessions, the plenum's full
+agenda (each item's summary, initiators, the government's position, who presents and who answers,
+live: who is speaking now), every vote and how each MK voted, bills with their stage in plain words,
+all 120 MKs (who's in the building now), the government, and a guide with a glossary. Live sessions
+open in the grid and recordings play in place. See [DESKTOP.md](DESKTOP.md) and, for the Knesset's
+data, [docs/knesset-data.md](docs/knesset-data.md).
 
 ## Privacy
 
@@ -195,7 +202,9 @@ Icons (Apache-2.0).
   ממשיך לציית למיקסר.
 - **חדשות:** 32 מקורות בעברית ובאנגלית (חמישה פעילים בהתחלה), סינון לפי מקור, משיכה לרענון,
   והוספת כל פיד RSS או Atom.
-- **הכנסת:** מה קורה היום במליאה ובוועדות, הוועדות וחבריהן, ההצבעות ואיך הצביע כל ח״כ, הצעות החוק
+- **הכנסת:** מה קורה היום במליאה ובוועדות, לוח שנה חודשי (ישיבות המליאה, דיוני הוועדות, חגים ופגרות),
+  סדר היום המלא של המליאה – לכל סעיף התקציר, היוזמים, "בתמיכת הממשלה", מי מנמק ומי משיב, ובזמן
+  הישיבה גם מי נואם עכשיו ומי הבא בתור – הוועדות וחבריהן, ההצבעות ואיך הצביע כל ח״כ, הצעות החוק
   ובאיזה שלב כל אחת, כל 120 חברי הכנסת, הממשלה ומדריך עם מילון מונחים – ישירות מהמידע של הכנסת.
   דיון חי נפתח כערוץ הגדול, והקלטות מתנגנות בנגן עם אפשרות דילוג.
 - **ניהול ערוצים:** הפעלה וכיבוי, שינוי סדר, הוספת ערוץ (כתובת m3u8, קוד הטמעה או קישור watch.knesset.tv), בדיקה ואיפוס.

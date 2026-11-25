@@ -41,6 +41,7 @@ Every request so far, in order, and where it stands on each platform.
 | R21 | All the Knesset view in the APK, like in the Windows app | ✅ (the same files) | ✅ the Knesset tab ([docs/rounds/03-news-center.md](docs/rounds/03-news-center.md)) |
 | R22 | The repository is now `news-center`: change everything from the old name to the new one | ✅ | ✅ |
 | R23 | Detach a stream from the program: take it out as a separate window and put it anywhere else | ✅ its own window (`D`): any monitor, on top of other apps, fullscreen on its monitor; its sound follows the mixer ([docs/rounds/04-own-windows.md](docs/rounds/04-own-windows.md)) | ✅ adapted: a pop-out button puts the channel in a floating picture-in-picture window, which goes anywhere on the screen (D-32) |
+| R24 | The plenum section is missing details from the Knesset's agenda page: the summary (תקציר), "בתמיכת הממשלה", the live agenda – everything relevant; and a calendar for a bigger overview | ✅ the plenum's full agenda and a calendar tab ([docs/rounds/05-agenda-and-calendar.md](docs/rounds/05-agenda-and-calendar.md)) | ✅ (the same files) |
 
 ## 3. Decision log
 
@@ -82,6 +83,11 @@ revisited.
 | D-31 | A window the user asks for comes to the front; one News Center reopens by itself (at start, back on air) doesn't take the focus | Reopening windows shouldn't take the keyboard from what the user is doing |
 | D-32 | On Android, a channel's own window is picture-in-picture, from a pop-out button on the big channel and in fullscreen, whether or not leaving the app does it (Settings) | Android gives an app one floating window, which the user can move anywhere over other apps; a second activity with its own players would compete for the app's single audio focus and the phone's few video decoders |
 | D-33 | CI runs the built `NewsCenter.exe` on the Windows runner and drives both windows through the browser's debugging port, with screenshots; the emulator test presses pop out and checks that Android entered picture-in-picture | The feature spans two windows, the host and Windows itself; only running the real program shows that the pieces fit |
+| D-34 | The plenum page shows a sitting's agenda from the website's own agenda service (`Plenum/GetSessionData` and its companions), not from the open data's `KNS_PlmSessionItem`; the open data still gives the sittings, votes, tabled items and records | Only the website's service has the summaries, the secretariat's notes (government support), who presents and who answers, the speakers and the live status; the open data has names and stages only. The two share the sitting's ID, so every sitting can be shown this way |
+| D-35 | "בתמיכת הממשלה" is shown when the secretariat's note on the item says so, never inferred | It's what the Knesset publishes on the agenda itself; the Ministerial Committee for Legislation's decisions aren't in either source |
+| D-36 | Summaries are cut to three lines, with "read more" on each item (only where the text is really cut) and "all summaries" for the page; opened summaries and lists stay open when the page refreshes itself, every minute while the plenum sits, and the refresh waits while someone types in the search | A Wednesday can have 20 bills with summaries of up to 1,900 characters each; reading one shouldn't be undone by the live refresh |
+| D-37 | The calendar is a month grid (Sunday on the right) from one open-data query for the month without agendas; the chosen day's agendas are asked for when it's chosen | With the agendas, a busy month's query takes 10 seconds instead of 2; counts and names are enough for the overview |
+| D-38 | Recess is marked from the working periods in `KNS_KnessetDates`, and the days between two Knessets are told apart; the calendar doesn't guess the Passover break | They're the only official dates in the data |
 
 ## 4. Architecture (Android)
 
@@ -138,6 +144,8 @@ MainActivity ── NewsCenterApp (Compose: Watch · Channels · News · Knesset
 - The Knesset view depends on the Knesset's data services, one of them undocumented; if the Knesset
   changes them, the affected parts show "couldn't load" (see docs/knesset-data.md). A recording
   pauses when you leave the app.
+- A sitting's votes reach the open data hours after the vote, so a live sitting's items show their
+  votes only later. The calendar doesn't mark the Passover break (it isn't in the Knesset's data).
 
 ## 7. Next options
 

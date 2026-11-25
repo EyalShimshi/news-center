@@ -61,9 +61,12 @@ Requests to avoid (they return 500, or a WAF "access denied" 473): `Entity(key)?
 
 | Endpoint | Gives |
 |---|---|
-| `Plenum/GetAgendaPlenum?sessionDate=<ISO>&IsDraft=false` | The day's plenum topics, with `IsLive` on the current one |
-| `Plenum/GetNextSession` | The next sitting |
-| `Plenum/GetWeeklyDates?CurrentDate=<UTC string>&Direction=&IsDraft=false` | The week's sittings, with Hebrew dates |
+| `Plenum/GetAgendaPlenum?sessionDate=<ISO>&IsDraft=false` | A day's plenum topics (`TitleId`, `Title`, `Ordinal`), each naming its sitting (`FK_ItemID`), with `IsLive` on the current one and `FinishTime` once the sitting ends |
+| `Plenum/GetSessionData?SessionId=<sitting>` | The sitting's agenda items, with summaries and live status (see "The plenum's agenda" below) |
+| `Plenum/GetSessionSpeakers?SessionId=<sitting>` | Each item's speakers: order, minutes, and while the sitting is on, who is speaking, has spoken or isn't in the hall |
+| `Plenum/GetAdditionalDocuments?SessionId=<sitting>` | Extra documents of items (for example a bill re-tabled for its second and third readings, or its table of amendments) |
+| `Plenum/GetNextSession` | The next sitting (`NextSessionItemId`, `NextSessionDate`), days before the open data lists it |
+| `Plenum/GetWeeklyDates?CurrentDate=<UTC string>&Direction=&IsDraft=false` | The week's sittings with their IDs and Hebrew dates; `Direction=-` is the week before |
 | `Committees/GetAllCommittees/he` | Current committees: chair, photo, live now, website ID |
 | `Committees/GetAllBroadcasts/he` | The last 50 broadcast sessions with recording URL, poster, and the open-data committee ID (`committeeSanId`) |
 | `CommitteeSessions/GetCommitteePortalsSessionDetails?ItemId=<session>&lang=he` | Invitees, agenda items with links, live stream (`LiveUrlFeed`, `IsLiveBroadcast`), recording (`ArchiveUrlFeed`), protocol, press releases |
@@ -84,6 +87,48 @@ fetch bridge sends.
 The website and the open data use different committee IDs (the website's are permanent across
 Knessets, e.g. 2213 = Finance). `GetAllBroadcasts` links the two for committees that broadcast;
 otherwise names are matched word by word ("הוועדה הזמנית לענייני כספים" ↔ "ועדת הכספים").
+
+### The plenum's agenda
+
+The website's agenda page (`/apps/plenum/agenda/<ddmmyyyy>`) is built from the four `Plenum/` calls
+above (found in its script chunk; `IsDraft=true` is for the Knesset's staff only). A sitting's ID
+there is the open data's `KNS_PlenumSession.Id`, so any sitting in the open data can be shown this
+way, and `KNS_PlenumVote.ItemID` links its votes to its items. `GetSessionData` gives one row per
+item:
+
+| Field | What it is |
+|---|---|
+| `TitleId` | The topic the item belongs to (`GetAgendaPlenum`'s `TitleId`) |
+| `OrdinalAlphabet`, `ItemName` | The item's letter within its topic (א, ב, ג…) and its name |
+| `FK_ItemID` | The item: for a bill, `KNS_Bill.Id` (so `LegislationItem/GetLegislationBillItem` gives its stages) |
+| `LU_ItemType` | 1 urgent question, 2 bill, 3 no-confidence motion, 4 motion for the agenda, 9 speeches and statements, 6000 notices and actions under law |
+| `Ext1` | The bill's number with a trailing " - ": `פ/286/26` (private), `כ-1207` (a committee's), `כ-997 (פ/3200/25)` |
+| `Ext2` | For a no-confidence motion, the factions behind it: "(יש עתיד)" |
+| `Initiators` | "של חבר הכנסת … וקבוצת חברי כנסת"; for a question, the asker and the question's number |
+| `Summery` (sic) | The summary (תקציר), plain text with line breaks, up to about 1,900 characters. It may end with the legal adviser's note between asterisks: `* הערת הייעוץ המשפטי: יש לאשר את ההצעה ברוב של 61 ח"כים לפחות … *` |
+| `SecretaryNotes` | The secretariat's notes, one per line: `בתמיכת ממשלה`, `בכפוף לקבלת פטור מחובת הנחה`, `דיון אישי והצבעה`, `הוצמדה להצעת חוק שמספרה פ/5716/25`, `תשובה משולבת על סעיפים (ו) ו-(ז)`, `הצבעה אחת על הסעיפים (יא) ו-(יב)`… |
+| `CommitteeName` | The committee that prepared a bill for its second and third readings |
+| `Presenter`/`PresenterType`, `Reasoner`/`ReasonerType`, `Answer`/`AnswerType` | Who presents, gives the reasons (מנמק/מנמקת) and answers (משיב/משיבה) – usually a minister for the government |
+| `DocPath` | The item's text on `fs.knesset.gov.il`, written with backslashes and a doubled slash (`https://fs.knesset.gov.il//26\law\26_lst_16333548.docx`) |
+| `IsLive`, `IsDone`, `CurrentSpeaker`, `NextSpeaker` | While the sitting is on: the item being discussed, the items done, who is speaking and who's next (the same on every row). They aren't meaningful afterwards (`IsDone` stays as it was) |
+| `IsActive` | `false`: taken off the agenda (the website strikes it through) |
+
+Speakers match an item by its internal ID while the sitting is on
+(`SessionItemId` = `FK_InternalSessionItemId`), and afterwards by its topic and session item
+(`TitleId` and `SessionItemId` = `FK_SessionItemId`). Extra documents match by `FK_Item_Id` =
+`FK_ItemID`. A finished sitting's votes reach the open data within hours; during the sitting there
+are none yet.
+
+### For a calendar
+
+- A month's committee sessions from the open data take about 2 seconds for a busy month (350
+  sessions, 4 pages); with each session's agenda items (`$expand=KNS_CmtSessionItem`) 10 seconds, so
+  the calendar asks for those only for the day you choose.
+- Plenum sittings come from `KNS_PlenumSession`, the next one from `GetNextSession` before that, and
+  each sitting's number of votes from `KNS_PlenumVote` (`SessionID`).
+- `Global/GetAllHolidays` lists holidays and memorial days from 2018 to 2050 (`Name`, `Date`).
+- `KNS_KnessetDates` gives each working period (מושב) its start and end: the days outside them are
+  recess, or between two Knessets. The Passover break inside a period isn't in the data.
 
 ### Video
 

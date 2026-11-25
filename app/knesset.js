@@ -1,6 +1,7 @@
 /*
- * News Center's Knesset view: the Knesset's day-to-day work in plain Hebrew – what's on today, the
- * committees, the plenum, votes, legislation, MKs, the government, and a guide. It reads the
+ * News Center's Knesset view: the Knesset's day-to-day work in plain Hebrew – what's on today, a
+ * calendar, the committees, the plenum and its agenda, votes, legislation, MKs, the government,
+ * and a guide. It reads the
  * Knesset's open data (OData) and the Knesset website's own API through the host's fetch bridge;
  * see docs/knesset-data.md for both. The Windows dashboard (app.js) and the Android app's Knesset
  * screen (android/app/src/main/assets/knesset/android.js) create it with NewsCenterKnesset(api):
@@ -23,6 +24,7 @@
 
   const TABS = [
     ['today', 'היום'],
+    ['calendar', 'לוח שנה'],
     ['committees', 'ועדות'],
     ['plenum', 'מליאה'],
     ['votes', 'הצבעות'],
@@ -40,7 +42,7 @@
     74: ['ועדות משנה', 'קבוצה קטנה מתוך ועדה, לנושא אחד שלה.'],
   };
 
-  const ITEM_TYPES = { 1: 'שאילתה', 2: 'הצעת חוק', 4: 'הצעה לסדר היום', 5: 'ישיבת מליאה', 11: 'נושא לדיון', 6000: 'פעולה על פי חוק', 6002: 'הצעת חוק', 6003: 'חוק' };
+  const ITEM_TYPES = { 1: 'שאילתה', 2: 'הצעת חוק', 3: 'הצעת אי-אמון', 4: 'הצעה לסדר היום', 5: 'ישיבת מליאה', 9: 'דברים במליאה', 11: 'נושא לדיון', 6000: 'פעולה על פי חוק', 6002: 'הצעת חוק', 6003: 'חוק' };
 
   const VOTE_RESULTS = { 7: ['בעד', 'for'], 8: ['נגד', 'against'], 6: ['נמנע (נוכח)', 'abstain'] };
 
@@ -102,6 +104,10 @@
   }
 
   const button = (label, onclick, cls = 'kn-btn', extra = {}) => h('button', { type: 'button', class: cls, onclick, ...extra }, label);
+
+  // The website writes document paths with backslashes and a doubled slash after the host.
+  const docUrl = path => String(path || '').trim().replace(/\\/g, '/').replace(/^(https?:\/\/[^/]+)\/+/i, '$1/');
+  const fileKind = url => (/\.pdf(?:$|[?#])/i.test(url) ? 'PDF' : /\.docx?(?:$|[?#])/i.test(url) ? 'Word' : '');
 
   function normalizeName(name) {
     return clean(name).replace(/["'״׳`]/g, '').replace(/[-–]/g, ' ').replace(/\s+/g, ' ').trim();
@@ -170,13 +176,31 @@
   }
 
   // "ח׳ בכסלו תשפ״ז"
-  function hebrewDate(date) {
+  function hebrewOf(date) {
     try {
       const parts = Object.fromEntries(hebrewParts.formatToParts(date).map(part => [part.type, part.value]));
-      return `${hebrewNumber(Number(parts.day))} ב${parts.month} ${hebrewNumber(Number(parts.year))}`;
+      return { day: Number(parts.day), month: parts.month, year: Number(parts.year) };
     } catch {
-      return '';
+      return null;
     }
+  }
+
+  function hebrewDate(date) {
+    const parts = hebrewOf(date);
+    return parts ? `${hebrewNumber(parts.day)} ב${parts.month} ${hebrewNumber(parts.year)}` : '';
+  }
+
+  // The Hebrew months a Gregorian month spans: "חשון–כסלו תשפ״ז".
+  function hebrewMonthRange(year, month) {
+    const seen = [];
+    for (let day = new Date(year, month, 1); day.getMonth() === month; day = new Date(year, month, day.getDate() + 1)) {
+      const parts = hebrewOf(day);
+      if (parts && !seen.some(item => item.month === parts.month && item.year === parts.year)) seen.push(parts);
+    }
+    if (!seen.length) return '';
+    const years = [...new Set(seen.map(item => item.year))];
+    if (years.length === 1) return `${seen.map(item => item.month).join('–')} ${hebrewNumber(years[0])}`;
+    return seen.map(item => `${item.month} ${hebrewNumber(item.year)}`).join(' – ');
   }
 
   function dayLabel(date, now = new Date()) {
@@ -189,6 +213,11 @@
 
   const time = date => (date ? timeFormat.format(date) : '');
   const shortDate = date => (date ? shortDateFormat.format(date) : '');
+  const monthFormat = new Intl.DateTimeFormat('he-IL', { month: 'long', year: 'numeric' });
+  const pad2 = n => String(n).padStart(2, '0');
+  const dayKey = date => `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
+  // The website's page for a day's plenum agenda: /apps/plenum/agenda/25112026.
+  const agendaUrl = date => `${SITE}/apps/plenum/agenda/${pad2(date.getDate())}${pad2(date.getMonth() + 1)}${date.getFullYear()}`;
 
   function count(n, one, many) {
     return n === 1 ? one : `${n} ${many}`;
@@ -216,7 +245,17 @@
       mkSearch: '',
       mkPresentOnly: false,
       glossarySearch: '',
+      // The plenum page: the sitting chosen with its arrows (none: the current one), whether it's
+      // on now, the agenda's search, and which summaries and lists are open (kept across refreshes).
       plenumId: null,
+      plenumLive: false,
+      agendaSearch: '',
+      allSummaries: false,
+      openKeys: new Set(),
+      // The calendar's month and chosen day (none: today), and whether that day takes the keyboard.
+      calMonth: null,
+      calDay: null,
+      calFocus: false,
     };
 
     /* Data */
@@ -282,16 +321,104 @@
       return odata(`KNS_CommitteeSession?$filter=StartDate ge ${odataDate(from)} and StartDate lt ${odataDate(to)}&$orderby=StartDate&$select=${SESSION_FIELDS}&$expand=KNS_Committee($select=Name),KNS_CmtSessionItem($select=ItemID,Name,ItemTypeID,Ordinal,StatusID)`);
     }, force);
 
-    const loadPlenumAgenda = force => cached('plenum-agenda', 2 * MIN, () =>
+    // Today's plenum topics; while a sitting is on they change every few minutes.
+    const loadPlenumAgenda = force => cached('plenum-agenda', 40 * 1000, () =>
       site(`Plenum/GetAgendaPlenum?sessionDate=${encodeURIComponent(startOfDay(new Date()).toISOString())}&IsDraft=false`), force);
 
     const loadNextPlenum = force => cached('plenum-next', 10 * MIN, () => site('Plenum/GetNextSession'), force);
+
+    // One sitting's agenda as the website shows it: the topics (GetAgendaPlenum, by the sitting's
+    // day), their items with summaries, initiators, notes and live status (GetSessionData), the
+    // speakers and extra documents. The website's sitting ID is the open data's KNS_PlenumSession.Id.
+    function loadSitting(session, force) {
+      const start = toDate(session.StartDate);
+      const today = Boolean(start) && sameDay(start, new Date());
+      return cached(`sitting-${session.Id}`, today ? 40 * 1000 : 30 * MIN, async () => {
+        const [topics, rows, speakers, docs] = await Promise.all([
+          today ? loadPlenumAgenda(force).catch(() => [])
+            : start ? site(`Plenum/GetAgendaPlenum?sessionDate=${encodeURIComponent(startOfDay(start).toISOString())}&IsDraft=false`).catch(() => []) : [],
+          site(`Plenum/GetSessionData?SessionId=${session.Id}`),
+          site(`Plenum/GetSessionSpeakers?SessionId=${session.Id}`).catch(() => []),
+          site(`Plenum/GetAdditionalDocuments?SessionId=${session.Id}`).catch(() => []),
+        ]);
+        return sittingAgenda(session, topics, rows, speakers, docs);
+      }, force);
+    }
+
+    // A sitting's votes; each names the agenda item it was about (ItemID).
+    const loadSittingVotes = (session, force) => cached(`sitting-votes-${session.Id}`, sameDay(toDate(session.StartDate), new Date()) ? 2 * MIN : 30 * MIN, () =>
+      odata(`KNS_PlenumVote?$filter=SessionID eq ${session.Id}&$orderby=VoteDateTime&$select=Id,VoteDateTime,ItemID,VoteTitle,VoteSubject,VoteMethodDesc`, 4), force);
 
     const loadSiteCommittees = force => cached('site-committees', 2 * MIN, () => site('Committees/GetAllCommittees/he'), force);
 
     const loadBroadcasts = force => cached('broadcasts', 5 * MIN, () => site('Committees/GetAllBroadcasts/he'), force);
 
     const loadHolidays = () => cached('holidays', 24 * 60 * MIN, () => site('Global/GetAllHolidays'));
+
+    // The Knesset's working periods (מושבים) of the last few Knessets; the days between them are
+    // recess, or the time between two Knessets.
+    const loadWorkPeriods = () => cached('work-periods', 24 * 60 * MIN, async () => {
+      const knesset = await loadKnesset();
+      const rows = await odata(`KNS_KnessetDates?$filter=KnessetNum ge ${knesset.number - 2}&$orderby=PlenumStart&$select=KnessetNum,Plenum,PlenumStart,PlenumFinish`, 2);
+      const periods = [];
+      for (const row of rows) {
+        const start = toDate(row.PlenumStart);
+        if (start && !periods.some(period => period.knesset === row.KnessetNum && period.start.getTime() === start.getTime())) {
+          periods.push({ knesset: row.KnessetNum, start, finish: toDate(row.PlenumFinish) });
+        }
+      }
+      return periods;
+    });
+
+    // A month for the calendar: committee sessions (without their agendas, which would take
+    // seconds for a busy month), plenum sittings with their number of votes, the next sitting if the
+    // open data doesn't list it yet, holidays and the working periods.
+    const loadMonth = (year, month, force) => cached(`month-${year}-${month}`, 5 * MIN, async () => {
+      const from = new Date(year, month, 1);
+      const to = new Date(year, month + 1, 1);
+      const range = field => `${field} ge ${odataDate(from)} and ${field} lt ${odataDate(to)}`;
+      const [sessions, sittings, votes, holidays, periods, next] = await Promise.all([
+        odata(`KNS_CommitteeSession?$filter=${range('StartDate')}&$orderby=StartDate&$select=${SESSION_FIELDS}&$expand=KNS_Committee($select=Name)`, 12),
+        odata(`KNS_PlenumSession?$filter=${range('StartDate')}&$orderby=StartDate&$select=Id,Number,KnessetNum,Name,StartDate,FinishDate,IsSpecialMeeting`, 1),
+        odata(`KNS_PlenumVote?$filter=${range('VoteDateTime')}&$select=Id,SessionID`, 8).catch(() => []),
+        loadHolidays().catch(() => []),
+        loadWorkPeriods().catch(() => []),
+        loadNextPlenum(force).catch(() => null),
+      ]);
+      const nextDate = next && toDate(next.NextSessionDate);
+      if (nextDate && nextDate >= from && nextDate < to && !sittings.some(sitting => sitting.Id === next.NextSessionItemId)) {
+        sittings.push({ Id: next.NextSessionItemId, StartDate: next.NextSessionDate, planned: true });
+      }
+      const votesBySitting = new Map();
+      for (const vote of votes) votesBySitting.set(vote.SessionID, (votesBySitting.get(vote.SessionID) || 0) + 1);
+      const days = new Map();
+      const dayOf = date => {
+        const key = dayKey(date);
+        if (!days.has(key)) days.set(key, { sittings: [], sessions: [], holidays: [] });
+        return days.get(key);
+      };
+      for (const sitting of sittings) {
+        const date = toDate(sitting.StartDate);
+        if (date) dayOf(date).sittings.push({ ...sitting, votes: votesBySitting.get(sitting.Id) || 0 });
+      }
+      for (const session of sessions) {
+        const date = toDate(session.StartDate);
+        if (date) dayOf(date).sessions.push(session);
+      }
+      for (const item of Array.isArray(holidays) ? holidays : []) {
+        const date = toDate(item.Date);
+        const name = clean(item.Name);
+        if (date && date >= from && date < to && name && !dayOf(date).holidays.includes(name)) dayOf(date).holidays.push(name);
+      }
+      return { days, periods, sessions: sessions.length, cancelled: sessions.filter(session => session.StatusID === 193).length, sittings: sittings.length, votes: votes.length };
+    }, force);
+
+    // One day's committee sessions with their agendas, for the calendar's chosen day.
+    const loadDaySessions = (date, force) => cached(`day-${dayKey(date)}`, sameDay(date, new Date()) ? 2 * MIN : 10 * MIN, () => {
+      const from = startOfDay(date);
+      const to = new Date(from.getFullYear(), from.getMonth(), from.getDate() + 1);
+      return odata(`KNS_CommitteeSession?$filter=StartDate ge ${odataDate(from)} and StartDate lt ${odataDate(to)}&$orderby=StartDate&$select=${SESSION_FIELDS}&$expand=KNS_Committee($select=Name),KNS_CmtSessionItem($select=ItemID,Name,ItemTypeID,Ordinal,StatusID)`, 3);
+    }, force);
 
     const loadCommittees = force => cached('committees', 30 * MIN, async () => {
       const knesset = await loadKnesset();
@@ -438,7 +565,7 @@
         // The MKs and the government share the slowest data; it loads while you read.
         loadMembers().catch(() => {});
         view.refreshTimer = setInterval(() => {
-          if (view.tab === 'today' && !document.hidden && !document.querySelector('dialog[open]')) render({ quiet: true });
+          if (autoRefreshes() && !document.hidden && !document.querySelector('dialog[open]')) render({ quiet: true });
         }, TODAY_REFRESH_MS);
         main.focus({ preventScroll: true });
       } else {
@@ -447,6 +574,11 @@
     }
 
     function setTab(tab) {
+      // The plenum page opens on the current sitting.
+      if (tab === 'plenum' && view.tab !== 'plenum') {
+        view.plenumId = null;
+        view.agendaSearch = '';
+      }
       view.tab = tab;
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify({ tab }));
@@ -466,9 +598,16 @@
       api.refreshChannels();
     }
 
-    // Back in sight after a while (another app or tab): today's page catches up at once.
+    // Today's page, and the plenum's while a sitting is on, keep themselves up to date – but not
+    // under someone typing in one of their search boxes.
+    function autoRefreshes() {
+      const typing = main.contains(document.activeElement) && document.activeElement.matches('input');
+      return (view.tab === 'today' || (view.tab === 'plenum' && view.plenumLive)) && !typing;
+    }
+
+    // Back in sight after a while (another app or tab): the page catches up at once.
     document.addEventListener('visibilitychange', () => {
-      if (!document.hidden && view.open && view.tab === 'today' && Date.now() - view.renderedAt > TODAY_REFRESH_MS) render({ quiet: true });
+      if (!document.hidden && view.open && autoRefreshes() && Date.now() - view.renderedAt > TODAY_REFRESH_MS) render({ quiet: true });
     });
 
     async function renderSubtitle() {
@@ -620,20 +759,33 @@
       return card;
     }
 
-    function plenumCard(topics, now) {
-      const live = topics.find(topic => topic.IsLive);
+    // "7 סעיפים, 3 בתמיכת הממשלה" for a topic of the plenum's agenda.
+    function topicCounts(topic) {
+      if (!topic) return '';
+      const supported = topic.items.filter(item => item.support).length;
+      return [topic.items.length > 1 ? `${topic.items.length} סעיפים` : '', supported ? `${supported > 1 ? `${supported} ` : ''}בתמיכת הממשלה` : ''].filter(Boolean).join(', ');
+    }
+
+    function plenumCard(topics, agenda) {
+      const isLive = topics.some(topic => topic.IsLive);
       const start = toDate(topics[0].StartTime);
-      const finish = toDate(topics.find(topic => topic.FinishTime)?.FinishTime);
-      const isLive = Boolean(live) || (start <= now && !finish && sameDay(start, now) && now - start < 10 * 60 * 60 * 1000 && Boolean(live));
+      const liveItem = agenda && agenda.live ? agenda.topics.flatMap(topic => topic.items).find(item => item.live) : null;
       return h('article', { class: `kn-card kn-session kn-plenum${isLive ? ' is-live' : ''}` },
         h('div', { class: 'kn-when' }, h('b', null, time(start))),
         h('div', { class: 'kn-what' },
           h('div', { class: 'kn-card-title' }, h('span', { class: 'kn-kind plenum' }, 'מליאה'), h('strong', null, 'ישיבת מליאת הכנסת'), isLive ? badge('מתקיימת עכשיו', 'live') : null),
-          h('ol', { class: 'kn-items' }, topics.map(topic => h('li', { class: topic.IsLive ? 'is-now' : '' }, clean(topic.Title), topic.IsLive ? badge('עכשיו', 'live') : null))),
+          h('ol', { class: 'kn-items' }, topics.map(topic => {
+            const counts = topicCounts(agenda && agenda.topics.find(item => item.id === topic.TitleId));
+            return h('li', { class: topic.IsLive ? 'is-now' : '' }, clean(topic.Title),
+              counts ? h('span', { class: 'muted' }, ` · ${counts}`) : null,
+              topic.IsLive ? badge('עכשיו', 'live') : null,
+              topic.IsLive && liveItem ? h('div', { class: 'kn-now-line' }, `${liveItem.letter ? `${liveItem.letter}. ` : ''}${liveItem.name}`) : null,
+              topic.IsLive && agenda && agenda.current ? h('div', { class: 'kn-now-line muted' }, `על הדוכן: ${agenda.current}${agenda.next ? ` · הבא בתור: ${agenda.next}` : ''}`) : null);
+          })),
           h('div', { class: 'kn-card-actions' },
             button(isLive ? 'צפייה בשידור חי' : 'לערוץ הכנסת', watchPlenum, isLive ? 'kn-btn live' : 'kn-btn'),
             button('סדר היום המלא', () => setTab('plenum')),
-            externalLink(`${SITE}/apps/plenum`, 'באתר הכנסת'))));
+            externalLink(start ? agendaUrl(start) : `${SITE}/apps/plenum`, 'באתר הכנסת'))));
     }
 
     async function renderToday(force) {
@@ -648,14 +800,17 @@
       const today = week.filter(session => sameDay(toDate(session.StartDate), now));
       const later = week.filter(session => startOfDay(toDate(session.StartDate)) > startOfDay(now));
       const topics = Array.isArray(agenda) ? agenda.slice().sort((a, b) => (a.Ordinal || 0) - (b.Ordinal || 0)) : [];
+      // Today's sitting in full: what's being discussed now and who is speaking.
+      const sitting = topics.length && topics[0].FK_ItemID ? await loadSitting({ Id: topics[0].FK_ItemID, StartDate: topics[0].StartTime }, force).catch(() => null) : null;
       const fragment = h('div', { class: 'kn-page' });
 
-      // On air: the Knesset streams the TV grid found, and today's live plenum topic.
+      // On air: the Knesset streams the TV grid found, and what the plenum is discussing.
       const streams = api.knessetChannels().filter(item => item.live);
       const liveTopic = topics.find(topic => topic.IsLive);
+      const liveItem = sitting && sitting.live ? sitting.topics.flatMap(topic => topic.items).find(item => item.live) : null;
       if (streams.length || liveTopic) {
         fragment.append(section('משודר עכשיו', h('div', { class: 'kn-live-row' },
-          liveTopic ? h('button', { type: 'button', class: 'kn-live', onclick: watchPlenum }, h('i', { class: 'kn-dot' }), h('span', null, h('b', null, 'מליאה'), clean(liveTopic.Title))) : null,
+          liveTopic ? h('button', { type: 'button', class: 'kn-live', onclick: watchPlenum }, h('i', { class: 'kn-dot' }), h('span', null, h('b', null, `מליאה · ${clean(liveTopic.Title)}`), liveItem ? liveItem.name : 'שידור חי')) : null,
           streams.filter(item => !(item.main && liveTopic)).map(item => h('button', {
             type: 'button', class: 'kn-live', onclick: () => openChannel(item.id),
           }, h('i', { class: 'kn-dot' }), h('span', null, h('b', null, item.name), item.now || 'שידור חי'))))));
@@ -663,7 +818,7 @@
 
       // Today's timeline: the plenum and every committee session, in time order.
       const timeline = [];
-      if (topics.length) timeline.push({ at: toDate(topics[0].StartTime), node: plenumCard(topics, now) });
+      if (topics.length) timeline.push({ at: toDate(topics[0].StartTime), node: plenumCard(topics, sitting) });
       for (const session of today) timeline.push({ at: toDate(session.StartDate), node: sessionCard(session, now, liveNames, recordings) });
       timeline.sort((a, b) => a.at - b.at);
       const cancelled = today.filter(session => session.StatusID === 193).length;
@@ -703,7 +858,9 @@
         h('dt', null, 'הכנסת'), h('dd', null, `הכנסת ה-${knesset.number} (${knesset.name}), מאז ${shortDate(knesset.start)}`),
         h('dt', null, 'תקופת העבודה'), h('dd', null, `המושב ה-${knesset.plenum}${knesset.sessionStart ? `, מאז ${shortDate(knesset.sessionStart)}` : ''}${knesset.sessionEnd ? ` עד ${shortDate(knesset.sessionEnd)}` : ''}`),
         upcoming.length ? [h('dt', null, 'מועדים קרובים'), h('dd', null, upcoming.map(item => `${item.name} (${shortDate(item.date)})`).join(' · '))] : null),
-        externalLink(`${SITE}/About/KnessetWork/Pages/WorkAndRecessDates.aspx`, 'מועדי עבודת הכנסת')));
+        h('div', { class: 'kn-card-actions' },
+          button('לוח השנה של הכנסת', () => setTab('calendar'), 'kn-btn small'),
+          externalLink(`${SITE}/About/KnessetWork/Pages/WorkAndRecessDates.aspx`, 'מועדי עבודת הכנסת'))));
       return fragment;
     }
 
@@ -833,37 +990,354 @@
 
     /* ---------- Plenum ---------- */
 
-    async function renderPlenum(force) {
-      const [sessions, agenda, knesset] = await Promise.all([loadPlenumSessions(force), loadPlenumAgenda(force).catch(() => []), loadKnesset()]);
-      const now = new Date();
-      const fragment = h('div', { class: 'kn-page' });
-      fragment.append(explain('המליאה היא כל 120 חברי הכנסת יחד: כאן מצביעים על חוקים, שואלים את השרים ומעלים נושאים לדיון. בחרו ישיבה כדי לראות מה היה על סדר היום.'));
-      const live = Array.isArray(agenda) && agenda.find(topic => topic.IsLive);
-      if (live) {
-        fragment.append(h('div', { class: 'kn-live-row' }, h('button', { type: 'button', class: 'kn-live', onclick: watchPlenum }, h('i', { class: 'kn-dot' }), h('span', null, h('b', null, 'המליאה עכשיו'), clean(live.Title)))));
+    // The Knesset secretariat's notes on an item say when the government supports it.
+    const GOV_SUPPORT = /תמיכת\s+ה?ממשלה|הממשלה\s+תומכת/;
+    const GOV_AGAINST = /התנגדות\s+ה?ממשלה|הממשלה\s+מתנגדת/;
+
+    // A summary can end with the Knesset legal adviser's note between asterisks
+    // ("* הערת הייעוץ המשפטי: יש לאשר את ההצעה ברוב של 61 ח"כים לפחות *").
+    function splitSummary(value) {
+      const legal = [];
+      const text = String(value || '').replace(/\r/g, '').replace(/\*([^*]{4,})\*/g, (_, note) => {
+        legal.push(clean(note));
+        return '\n';
+      });
+      return { paragraphs: text.split(/\n+/).map(clean).filter(Boolean), legal: legal.filter(Boolean) };
+    }
+
+    // One item of a sitting's agenda, from the website's GetSessionData.
+    function agendaItem(row, speakers, docs) {
+      const notes = String(row.SecretaryNotes || '').split(/\r?\n/).map(clean).filter(Boolean);
+      const { paragraphs, legal } = splitSummary(row.Summery);
+      const internal = row.FK_InternalSessionItemId;
+      return {
+        key: `${row.TitleId}-${row.FK_SessionItemId || row.FK_ItemID}`,
+        itemId: row.FK_ItemID,
+        type: row.LU_ItemType,
+        letter: clean(row.OrdinalAlphabet),
+        name: clean(row.ItemName),
+        number: clean(String(row.Ext1 || '').replace(/[\s\-–]+$/, '')),
+        parties: clean(row.Ext2).replace(/^\(\s*/, '(').replace(/\s*\)$/, ')'),
+        initiators: clean(row.Initiators),
+        committee: clean(row.CommitteeName),
+        roles: [['מציג', row.PresenterType, row.Presenter], ['מנמק', row.ReasonerType, row.Reasoner], ['משיב', row.AnswerType, row.Answer]]
+          .filter(([, , who]) => clean(who))
+          .map(([fallback, type, who]) => [clean(type).replace(/:$/, '') || fallback, clean(who)]),
+        support: notes.some(note => GOV_SUPPORT.test(note)),
+        against: notes.some(note => GOV_AGAINST.test(note)),
+        notes: notes.filter(note => !GOV_SUPPORT.test(note) && !GOV_AGAINST.test(note)),
+        summary: paragraphs,
+        legal,
+        doc: docUrl(row.DocPath),
+        docs: docs.filter(doc => doc.FK_Item_Id === row.FK_ItemID && doc.FilePath).map(doc => ({ url: docUrl(doc.FilePath), name: clean(doc.FileDesc) || 'מסמך' })),
+        // While a sitting is on, its speakers point at the item's internal ID; later at its topic and session item.
+        speakers: speakers.filter(speaker => (internal && speaker.SessionItemId === internal) || (speaker.TitleId === row.TitleId && speaker.SessionItemId === row.FK_SessionItemId))
+          .sort((a, b) => (a.Ordinal || 0) - (b.Ordinal || 0)),
+        live: Boolean(row.IsLive),
+        done: Boolean(row.IsDone),
+        active: row.IsActive !== false,
+      };
+    }
+
+    function sittingAgenda(session, topics, rows, speakers, docs) {
+      const items = Array.isArray(rows) ? rows : [];
+      const speakerRows = Array.isArray(speakers) ? speakers : [];
+      const docRows = Array.isArray(docs) ? docs : [];
+      // A day can have two sittings; each topic names its own.
+      const list = (Array.isArray(topics) ? topics : []).filter(topic => !topic.FK_ItemID || topic.FK_ItemID === session.Id)
+        .slice().sort((a, b) => (a.Ordinal || 0) - (b.Ordinal || 0))
+        .map(topic => ({ id: topic.TitleId, title: clean(topic.Title), live: Boolean(topic.IsLive), finish: toDate(topic.FinishTime) }));
+      for (const row of items) {
+        if (!list.some(topic => topic.id === row.TitleId)) list.push({ id: row.TitleId, title: '', live: false, finish: null });
       }
-      fragment.append(section('ישיבות המליאה', h('ul', { class: 'kn-agenda kn-sittings' }, sessions.map(session => {
-        const start = toDate(session.StartDate);
-        const ongoing = start <= now && !session.FinishDate && sameDay(start, now);
-        return h('li', null, h('button', { type: 'button', class: 'kn-row-btn', onclick: () => openPlenum(session) },
-          h('b', null, `${dayLabel(start, now)} · ${shortDate(start)} ${time(start)}`),
-          h('span', null, `ישיבה ${session.Number || ''}${session.KnessetNum && session.KnessetNum !== knesset.number ? ` של הכנסת ה-${session.KnessetNum}` : ''}${session.IsSpecialMeeting ? ' (ישיבה מיוחדת)' : ''}`),
-          ongoing ? badge('מתקיימת', 'live') : start > now ? badge('מתוכננת', 'muted') : null));
+      for (const topic of list) topic.items = items.filter(row => row.TitleId === topic.id).map(row => agendaItem(row, speakerRows, docRows));
+      const live = list.some(topic => topic.live) || items.some(row => row.IsLive);
+      const speaking = live ? items.find(row => clean(row.CurrentSpeaker)) : null;
+      return {
+        session,
+        topics: list,
+        count: items.length,
+        live,
+        finish: list.map(topic => topic.finish).find(Boolean) || null,
+        current: speaking ? clean(speaking.CurrentSpeaker) : '',
+        next: speaking ? clean(speaking.NextSpeaker) : '',
+      };
+    }
+
+    const hasAgenda = agenda => Boolean(agenda && (agenda.count || agenda.topics.length));
+
+    function votesByItem(votes) {
+      const map = new Map();
+      for (const vote of votes || []) {
+        if (!vote.ItemID) continue;
+        if (!map.has(vote.ItemID)) map.set(vote.ItemID, []);
+        map.get(vote.ItemID).push(vote);
+      }
+      return map;
+    }
+
+    // A <details> that stays open or closed across the page's automatic refreshes.
+    function remembered(key, label, ...content) {
+      const element = h('details', { class: 'kn-more', open: view.openKeys.has(key) }, h('summary', null, label), ...content);
+      element.addEventListener('toggle', () => {
+        if (element.open) view.openKeys.add(key);
+        else view.openKeys.delete(key);
+      });
+      return element;
+    }
+
+    const longSummary = item => item.summary.join(' ').length > 260 || item.summary.length > 2;
+
+    function speakerRow(speaker, live) {
+      const current = live && speaker.IsCurrent;
+      const spoke = live && speaker.IsSpoken && !current;
+      const away = live && !speaker.IsPresent && !current && !spoke;
+      const female = speaker.Gender === 0;
+      return h('li', { class: [current ? 'is-current' : '', spoke ? 'is-spoken' : '', away ? 'is-away' : ''].filter(Boolean).join(' ') || null, title: away ? 'לא באולם' : null },
+        clean(speaker.Speaker),
+        speaker.SpokenTime ? h('span', { class: 'muted' }, ` · ${speaker.SpokenTime} דק׳`) : null,
+        current ? badge(female ? 'מדברת עכשיו' : 'מדבר עכשיו', 'live') : null,
+        spoke ? h('span', { class: 'kn-check', title: female ? 'כבר דיברה' : 'כבר דיבר' }, '✓') : null);
+    }
+
+    // An item of the agenda: its letter and name, the government's position, the number and the
+    // initiators, who presents it and who answers, the secretariat's notes, the summary, documents,
+    // the bill's stages, votes, and the speakers. Done and live marks only while the sitting is on.
+    function agendaItemView(item, { live, votes }) {
+      const long = longSummary(item);
+      const openKey = `summary:${item.key}`;
+      const open = view.openKeys.has(openKey);
+      const li = h('li', {
+        class: ['kn-item', live && item.live ? 'is-live' : '', live && item.done && !item.live ? 'is-done' : '', item.active ? '' : 'is-inactive', open ? 'is-open' : ''].filter(Boolean).join(' '),
+        'data-key': item.key,
+        'data-text': normalizeName([item.letter, item.name, item.number, item.parties, item.initiators, item.committee, ...item.roles.flat(), ...item.notes, ...item.summary, item.support ? 'בתמיכת הממשלה' : ''].join(' ')),
+      });
+      const more = long ? h('button', { type: 'button', class: 'kn-more-btn', 'aria-expanded': String(open) }, open ? 'פחות' : 'להמשך התקציר') : null;
+      if (more) {
+        more.addEventListener('click', () => {
+          const expanded = !li.classList.contains('is-open');
+          li.classList.toggle('is-open', expanded);
+          more.setAttribute('aria-expanded', String(expanded));
+          more.textContent = expanded ? 'פחות' : 'להמשך התקציר';
+          if (expanded) view.openKeys.add(openKey);
+          else view.openKeys.delete(openKey);
+        });
+      }
+      const meta = [item.number, item.parties, item.initiators, item.committee ? `ועדה: ${item.committee}` : ''].filter(Boolean);
+      const docLabel = item.type === 1 ? 'נוסח השאילתה' : item.type === 2 ? 'נוסח ההצעה' : 'המסמך';
+      const withKind = (label, url) => `${label}${fileKind(url) ? ` (${fileKind(url)})` : ''}`;
+      const actions = [
+        item.doc ? externalLink(item.doc, withKind(docLabel, item.doc)) : null,
+        ...item.docs.map(doc => externalLink(doc.url, withKind(doc.name, doc.url))),
+        item.type === 2 && item.itemId ? button('שלבי החקיקה', () => openBill({ Id: item.itemId, Name: item.name }), 'kn-btn small') : null,
+        votes.length === 1 ? button('תוצאת ההצבעה', () => openVote(votes[0]), 'kn-btn small') : null,
+      ].filter(Boolean);
+      li.append(
+        h('div', { class: 'kn-item-head' },
+          item.letter ? h('span', { class: 'kn-letter' }, `${item.letter}.`) : null,
+          h('strong', { class: 'kn-item-name' }, item.name),
+          live && item.live ? badge('עכשיו בדיון', 'live') : null,
+          live && item.done && !item.live ? badge('נדון', 'done') : null,
+          item.active ? null : badge('ירד מסדר היום', 'cancelled'),
+          item.support ? badge('בתמיכת הממשלה', 'gov') : null,
+          item.against ? badge('בהתנגדות הממשלה', 'warn') : null),
+        meta.length ? h('p', { class: 'kn-item-meta' }, meta.join(' · ')) : null,
+        item.roles.length ? h('p', { class: 'kn-item-roles' }, item.roles.map(([type, who], i) => [i ? ' · ' : '', h('span', { class: 'muted' }, `${type}: `), who])) : null,
+        item.notes.length ? h('ul', { class: 'kn-notes' }, item.notes.map(note => h('li', null, note))) : null,
+        item.summary.length ? h('div', { class: 'kn-item-summary' },
+          h('b', null, 'תקציר'),
+          h('p', { class: `kn-summary-text${long ? ' is-long' : ''}` }, item.summary.join('\n')),
+          more) : null,
+        item.legal.map(note => h('p', { class: 'kn-legal' }, note)),
+        actions.length ? h('div', { class: 'kn-item-actions' }, actions) : null,
+        votes.length > 1 ? remembered(`votes:${item.key}`, `הצבעות (${votes.length})`, h('ul', { class: 'kn-agenda' }, votes.map(vote => h('li', null,
+          h('button', { type: 'button', class: 'kn-row-btn', onclick: () => openVote(vote) }, h('b', null, time(toDate(vote.VoteDateTime))), h('span', null, clean(vote.VoteSubject) || clean(vote.VoteTitle))))))) : null,
+        item.speakers.length ? remembered(`speakers:${item.key}`, `הדוברים (${item.speakers.length})`, h('ol', { class: 'kn-speakers' }, item.speakers.map(speaker => speakerRow(speaker, live)))) : null);
+      return li;
+    }
+
+    // The sitting's agenda, topic by topic; a long one gets a search over every item's text.
+    function agendaView(agenda, { votes = new Map(), search = false } = {}) {
+      const showAll = 'כל התקצירים במלואם';
+      const showLess = 'לקצר את התקצירים';
+      const container = h('div', { class: `kn-agenda-view${view.allSummaries ? ' show-all' : ''}` });
+      const toolbar = h('div', { class: 'kn-toolbar' });
+      const noMatch = empty('אין סעיפים שמתאימים לחיפוש.');
+      noMatch.hidden = true;
+      const filter = () => {
+        const words = normalizeName(view.agendaSearch).split(' ').filter(Boolean);
+        let shown = 0;
+        for (const topic of container.querySelectorAll('.kn-topic')) {
+          const titleMatch = words.every(word => normalizeName(topic.querySelector('h4').textContent).includes(word));
+          let visible = 0;
+          for (const item of topic.querySelectorAll('.kn-item')) {
+            item.hidden = !titleMatch && !words.every(word => item.dataset.text.includes(word));
+            if (!item.hidden) visible++;
+          }
+          topic.hidden = !titleMatch && visible === 0;
+          if (!topic.hidden) shown++;
+        }
+        noMatch.hidden = shown > 0;
+      };
+      if (search) {
+        const input = h('input', { type: 'search', class: 'kn-search', placeholder: 'חיפוש בסדר היום', value: view.agendaSearch, 'aria-label': 'חיפוש בסדר היום' });
+        input.addEventListener('input', () => {
+          view.agendaSearch = input.value;
+          filter();
+        });
+        toolbar.append(input);
+      }
+      if (agenda.topics.some(topic => topic.items.some(longSummary))) {
+        const toggle = button(view.allSummaries ? showLess : showAll, () => {
+          view.allSummaries = !view.allSummaries;
+          container.classList.toggle('show-all', view.allSummaries);
+          toggle.textContent = view.allSummaries ? showLess : showAll;
+        }, 'kn-btn small');
+        toolbar.append(toggle);
+      }
+      if (toolbar.childElementCount) container.append(toolbar);
+      agenda.topics.forEach((topic, index) => {
+        const counts = topicCounts(topic);
+        container.append(h('section', { class: `kn-topic${agenda.live && topic.live ? ' is-live' : ''}` },
+          h('div', { class: 'kn-topic-head' },
+            h('span', { class: 'kn-topic-num' }, String(index + 1)),
+            h('h4', null, topic.title || 'נושא'),
+            agenda.live && topic.live ? badge('עכשיו', 'live') : null,
+            counts ? h('span', { class: 'muted' }, counts) : null),
+          topic.items.length ? h('ol', { class: 'kn-item-list' }, topic.items.map(item => agendaItemView(item, { live: agenda.live, votes: votes.get(item.itemId) || [] }))) : null));
+      });
+      container.append(noMatch);
+      if (search && view.agendaSearch) filter();
+      // "להמשך התקציר" only where the summary is really cut, which depends on the width.
+      new ResizeObserver(() => {
+        if (container.classList.contains('show-all')) return;
+        for (const text of container.querySelectorAll('.kn-summary-text.is-long')) {
+          const item = text.closest('.kn-item');
+          if (!item.classList.contains('is-open') && text.clientHeight) item.classList.toggle('fits', text.scrollHeight <= text.clientHeight + 1);
+        }
+      }).observe(container);
+      return container;
+    }
+
+    // While a sitting is on: the topic and the item being discussed, who is speaking and who's next.
+    function nowPanel(agenda) {
+      const items = agenda.topics.flatMap(topic => topic.items);
+      const item = items.find(entry => entry.live);
+      const topic = agenda.topics.find(entry => entry.live) || agenda.topics.find(entry => entry.items.includes(item));
+      const active = items.filter(entry => entry.active);
+      const done = active.filter(entry => entry.done).length;
+      return h('div', { class: 'kn-now' },
+        h('div', { class: 'kn-now-head' }, h('i', { class: 'kn-dot' }), h('b', null, 'המליאה עכשיו'), topic && topic.title ? h('span', null, topic.title) : null),
+        item ? h('p', { class: 'kn-now-item' }, `${item.letter ? `${item.letter}. ` : ''}${item.name}`) : null,
+        agenda.current ? h('p', null, h('span', { class: 'muted' }, 'על הדוכן: '), agenda.current, agenda.next ? [h('span', { class: 'muted' }, ' · הבא בתור: '), agenda.next] : null) : null,
+        active.length ? h('p', { class: 'muted' }, `${done} מתוך ${active.length} סעיפים נדונו`) : null,
+        h('div', { class: 'kn-card-actions' },
+          button('צפייה בשידור חי', watchPlenum, 'kn-btn live'),
+          item ? button('לסעיף שבדיון', () => main.querySelector(`.kn-item[data-key="${CSS.escape(item.key)}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })) : null));
+    }
+
+    // The sittings, newest first, with the next one when the open data doesn't list it yet.
+    function sittingsWithNext(sessions, next) {
+      const list = sessions.slice();
+      const date = next && toDate(next.NextSessionDate);
+      if (date && next.NextSessionItemId && !list.some(session => session.Id === next.NextSessionItemId)) {
+        list.push({ Id: next.NextSessionItemId, StartDate: next.NextSessionDate, planned: true });
+      }
+      return list.sort((a, b) => toDate(b.StartDate) - toDate(a.StartDate));
+    }
+
+    // The sitting the page shows: the one chosen with the arrows; else today's, else the next one if
+    // its agenda is out, else the last one.
+    async function featuredSitting(sittings, now, force) {
+      const chosen = view.plenumId ? sittings.find(session => session.Id === view.plenumId) : null;
+      const upcoming = sittings.filter(session => toDate(session.StartDate) > now);
+      const candidates = chosen ? [chosen] : [...new Set([
+        sittings.find(session => sameDay(toDate(session.StartDate), now)),
+        upcoming[upcoming.length - 1],
+        sittings.find(session => toDate(session.StartDate) <= now && !sameDay(toDate(session.StartDate), now)),
+      ].filter(Boolean))];
+      let first = null;
+      for (const sitting of candidates) {
+        try {
+          const agenda = await loadSitting(sitting, force);
+          if (hasAgenda(agenda)) return { sitting, agenda };
+          first = first || { sitting, agenda };
+        } catch (error) {
+          first = first || { sitting, agenda: null, error };
+        }
+      }
+      return first || { sitting: null, agenda: null };
+    }
+
+    async function renderPlenum(force) {
+      const [sessions, next, knesset] = await Promise.all([loadPlenumSessions(force), loadNextPlenum(force).catch(() => null), loadKnesset()]);
+      const now = new Date();
+      const sittings = sittingsWithNext(sessions, next);
+      const { sitting, agenda, error } = await featuredSitting(sittings, now, force);
+      const start = sitting && toDate(sitting.StartDate);
+      const votes = sitting && !sitting.planned && start <= now ? await loadSittingVotes(sitting, force).catch(() => []) : [];
+      view.plenumLive = Boolean(agenda && agenda.live);
+      const fragment = h('div', { class: 'kn-page' });
+      fragment.append(explain('המליאה היא כל 120 חברי הכנסת יחד: כאן מצביעים על חוקים, שואלים את השרים ומעלים נושאים לדיון. סדר היום מפרט כל סעיף: מי הגיש, מה מוצע, מה עמדת הממשלה ומי מציג ומשיב.'));
+      if (agenda && agenda.live) fragment.append(nowPanel(agenda));
+      if (sitting) {
+        const ordered = sittings.slice().reverse();
+        const index = ordered.indexOf(sitting);
+        const earlier = index > 0 ? ordered[index - 1] : null;
+        const later = index >= 0 && index < ordered.length - 1 ? ordered[index + 1] : null;
+        const go = target => {
+          view.plenumId = target ? target.Id : null;
+          view.agendaSearch = '';
+          render();
+        };
+        const status = agenda && agenda.live ? badge('מתקיימת עכשיו', 'live')
+          : sitting.FinishDate || (agenda && agenda.finish) ? badge('הסתיימה', 'done')
+            : start > now ? badge('מתוכננת', 'muted') : null;
+        // Shown instead of a next sitting whose agenda isn't out yet.
+        const nextSitting = !view.plenumId && start < startOfDay(now) && later && toDate(later.StartDate) > now ? toDate(later.StartDate) : null;
+        fragment.append(h('section', { class: 'kn-section kn-featured', 'data-session': String(sitting.Id) },
+          h('div', { class: 'kn-featured-head' },
+            h('h3', null, `סדר היום · ${dayLabel(start, now)}, ${shortDate(start)}, ${time(start)}`),
+            status,
+            sitting.Number ? h('span', { class: 'muted' }, `ישיבה ${sitting.Number}${sitting.KnessetNum && sitting.KnessetNum !== knesset.number ? ` של הכנסת ה-${sitting.KnessetNum}` : ''}`) : null),
+          h('div', { class: 'kn-sitting-nav' },
+            earlier ? button('→ הישיבה הקודמת', () => go(earlier), 'kn-btn small') : null,
+            later ? button('הישיבה הבאה ←', () => go(later), 'kn-btn small') : null,
+            view.plenumId ? button('לישיבה הנוכחית', () => go(null), 'kn-btn small') : null),
+          nextSitting ? h('p', { class: 'muted' }, `הישיבה הבאה: ${dayLabel(nextSitting, now)}, ${shortDate(nextSitting)}, בשעה ${time(nextSitting)}. סדר היום שלה עדיין לא פורסם.`) : null,
+          hasAgenda(agenda)
+            ? [agenda.count ? explain('"מנמק" מציג את ההצעה ומסביר אותה; "משיב" עונה בשם הממשלה או הוועדה. "בתמיכת הממשלה" – ועדת השרים לחקיקה החליטה לתמוך בהצעה, ובדרך כלל גם הקואליציה מצביעה בעדה.') : null,
+              agendaView(agenda, { votes: votesByItem(votes), search: agenda.count > 5 })]
+            : error ? problem(error, () => render({ force: true }))
+              : empty(start > now ? 'סדר היום של הישיבה הזאת עדיין לא פורסם.' : 'לא פורסם סדר יום לישיבה הזאת.'),
+          h('div', { class: 'kn-card-actions' },
+            sitting.planned ? null : button('פרטי הישיבה: הצבעות ומסמכים', () => openPlenum(sitting), 'kn-btn small'),
+            externalLink(agendaUrl(start), 'סדר היום באתר הכנסת'))));
+      }
+      fragment.append(section('ישיבות המליאה', h('ul', { class: 'kn-agenda kn-sittings' }, sittings.map(session => {
+        const date = toDate(session.StartDate);
+        const ongoing = date <= now && !session.FinishDate && sameDay(date, now);
+        return h('li', { class: session.planned ? 'is-planned' : null }, h('button', { type: 'button', class: 'kn-row-btn', onclick: () => openPlenum(session) },
+          h('b', null, `${dayLabel(date, now)} · ${shortDate(date)} ${time(date)}`),
+          h('span', null, session.planned ? 'הישיבה הבאה' : `ישיבה ${session.Number || ''}${session.KnessetNum && session.KnessetNum !== knesset.number ? ` של הכנסת ה-${session.KnessetNum}` : ''}${session.IsSpecialMeeting ? ' (ישיבה מיוחדת)' : ''}`),
+          ongoing ? badge('מתקיימת', 'live') : date > now ? badge('מתוכננת', 'muted') : null));
       }))));
       fragment.append(h('p', { class: 'kn-note' }, externalLink(`${SITE}/apps/plenum`, 'סדר היום של המליאה באתר הכנסת'), ' ', externalLink(`${SITE}/apps/smartprotocol/search`, 'דברי הכנסת')));
-      if (!view.plenumId && sessions[0]) view.plenumId = sessions[0].Id;
       return fragment;
     }
 
     function openPlenum(session) {
       const start = toDate(session.StartDate);
       openDetail(`ישיבת המליאה · ${shortDate(start)}`, async () => {
-        const [items, docs, votes, statuses] = await Promise.all([
-          odata(`KNS_PlmSessionItem?$filter=PlenumSessionID eq ${session.Id}&$orderby=Ordinal&$select=ItemID,ItemTypeID,ItemTypeDesc,Ordinal,Name,StatusID,IsDiscussion`, 4),
+        const [agenda, items, docs, votes, statuses] = await Promise.all([
+          loadSitting(session).catch(() => null),
+          odata(`KNS_PlmSessionItem?$filter=PlenumSessionID eq ${session.Id}&$orderby=Ordinal&$select=ItemID,ItemTypeID,ItemTypeDesc,Ordinal,Name,StatusID,IsDiscussion`, 4).catch(() => []),
           odata(`KNS_DocumentPlenumSession?$filter=PlenumSessionID eq ${session.Id}&$select=GroupTypeDesc,ApplicationDesc,FilePath`, 1).catch(() => []),
-          odata(`KNS_PlenumVote?$filter=SessionID eq ${session.Id}&$orderby=VoteDateTime&$select=Id,VoteDateTime,VoteTitle,VoteSubject,VoteMethodDesc`, 2).catch(() => []),
+          loadSittingVotes(session).catch(() => []),
           loadStatuses().catch(() => new Map()),
         ]);
+        const now = new Date();
+        const finish = toDate(session.FinishDate) || (agenda && agenda.finish);
         const discussed = items.filter(item => item.IsDiscussion);
         const tabled = items.filter(item => !item.IsDiscussion);
         const byType = list => {
@@ -878,15 +1352,216 @@
               item.ItemTypeID === 2 ? button('שלבי החקיקה', () => openBill({ Id: item.ItemID, Name: item.Name, StatusID: item.StatusID }), 'kn-btn small') : null,
               statuses.get(item.StatusID) && item.ItemTypeID === 2 ? h('span', { class: 'muted' }, ` · ${statuses.get(item.StatusID)}`) : null)))));
         };
+        const onAir = agenda ? agenda.live : sameDay(start, now) && start <= now && !finish;
         return h('div', { class: 'kn-stack' },
-          h('p', { class: 'kn-big' }, `${dayLabel(start)}, ${shortDate(start)}, בשעה ${time(start)}${session.FinishDate ? ` – ${time(toDate(session.FinishDate))}` : ''}`),
-          sameDay(start, new Date()) && !session.FinishDate ? h('div', { class: 'kn-card-actions' }, button('צפייה בשידור', watchPlenum, 'kn-btn live')) : null,
-          section('נדונו בישיבה', discussed.length ? byType(discussed) : empty('לא פורסם סדר יום לדיון.')),
+          h('p', { class: 'kn-big' }, `${dayLabel(start)}, ${shortDate(start)}, בשעה ${time(start)}${finish ? ` – ${time(finish)}` : ''}`),
+          onAir ? h('div', { class: 'kn-card-actions' }, button('צפייה בשידור חי', watchPlenum, 'kn-btn live')) : null,
+          hasAgenda(agenda)
+            ? section('סדר היום', agendaView(agenda, { votes: votesByItem(votes) }))
+            : section('נדונו בישיבה', discussed.length ? byType(discussed) : empty(start > now ? 'סדר היום עדיין לא פורסם.' : 'לא פורסם סדר יום לדיון.')),
           tabled.length ? section(`הונחו על שולחן הכנסת (${tabled.length})`, explain('"הנחה" היא פרסום רשמי לכל חברי הכנסת – עדיין לא דיון. הצעות חוק פרטיות מונחות כך לפני הקריאה הטרומית.'), h('details', { class: 'kn-more' }, h('summary', null, 'להציג את כולן'), byType(tabled))) : null,
           votes.length ? section(`הצבעות (${votes.length})`, h('ul', { class: 'kn-agenda' }, votes.map(vote => h('li', null,
             h('button', { type: 'button', class: 'kn-row-btn', onclick: () => openVote(vote) }, h('b', null, time(toDate(vote.VoteDateTime))), h('span', null, clean(vote.VoteTitle), vote.VoteSubject ? h('span', { class: 'muted' }, ` – ${clean(vote.VoteSubject)}`) : null)))))) : null,
-          docs.length ? section('מסמכים', h('ul', { class: 'kn-docs' }, docs.map(doc => h('li', null, externalLink(doc.FilePath, `${clean(doc.GroupTypeDesc)} (${doc.ApplicationDesc})`))))) : null);
+          docs.length ? section('מסמכים', h('ul', { class: 'kn-docs' }, docs.map(doc => h('li', null, externalLink(doc.FilePath, `${clean(doc.GroupTypeDesc)} (${doc.ApplicationDesc})`))))) : null,
+          externalLink(agendaUrl(start), 'סדר היום באתר הכנסת'));
       });
+    }
+
+    /* ---------- Calendar ---------- */
+
+    const WEEKDAYS = ['א׳', 'ב׳', 'ג׳', 'ד׳', 'ה׳', 'ו׳', 'ש׳'];
+
+    // Whether the Knesset works on a day: '' (in session, or not known), 'recess', or 'between'
+    // (after one Knesset's last session and before the next one is sworn in).
+    function workState(date, periods) {
+      if (!periods.length) return '';
+      const day = startOfDay(date);
+      if (day < startOfDay(periods[0].start)) return '';
+      if (periods.some(period => day >= startOfDay(period.start) && (!period.finish || day <= startOfDay(period.finish)))) return '';
+      const before = periods.filter(period => period.finish && startOfDay(period.finish) < day).pop();
+      const after = periods.find(period => startOfDay(period.start) > day);
+      return before && after && after.knesset !== before.knesset ? 'between' : 'recess';
+    }
+
+    function calendarCell(date, data, now) {
+      const info = data.days.get(dayKey(date)) || { sittings: [], sessions: [], holidays: [] };
+      const sessions = info.sessions.filter(session => session.StatusID !== 193).length;
+      const sitting = info.sittings[0];
+      const state = workState(date, data.periods);
+      const hebrew = hebrewOf(date);
+      const today = sameDay(date, now);
+      const selected = Boolean(view.calDay) && sameDay(view.calDay, date);
+      const label = [
+        fullDayFormat.format(date),
+        hebrew ? `${hebrewNumber(hebrew.day)} ב${hebrew.month}` : '',
+        ...info.holidays,
+        sitting ? `ישיבת מליאה בשעה ${time(toDate(sitting.StartDate))}` : '',
+        sessions ? count(sessions, 'דיון אחד בוועדות', 'דיונים בוועדות') : '',
+        state === 'recess' ? 'פגרה' : state === 'between' ? 'בין כנסות' : '',
+      ].filter(Boolean).join(', ');
+      const classes = ['kn-cal-day', today ? 'is-today' : '', selected ? 'is-selected' : '', date.getDay() >= 5 ? 'is-weekend' : '', state ? 'is-recess' : '',
+        sitting ? 'has-plenum' : '', sessions ? 'has-cmt' : '', info.holidays.length ? 'has-holiday' : ''];
+      return h('button', {
+        type: 'button', class: classes.filter(Boolean).join(' '), 'data-day': dayKey(date), 'aria-pressed': String(selected),
+        'aria-current': today ? 'date' : null, 'aria-label': label, tabindex: selected ? '0' : '-1',
+      },
+        h('span', { class: 'kn-cal-top' },
+          h('span', { class: 'kn-cal-num' }, String(date.getDate())),
+          hebrew ? h('span', { class: 'kn-cal-heb' }, `${hebrewNumber(hebrew.day)}${hebrew.day === 1 ? ` ${hebrew.month}` : ''}`) : null),
+        sitting ? h('span', { class: 'kn-cal-plenum' }, h('span', { class: 'kn-cal-words' }, 'מליאה '), time(toDate(sitting.StartDate))) : null,
+        sessions ? h('span', { class: 'kn-cal-cmt' }, h('b', null, String(sessions)), h('span', { class: 'kn-cal-words' }, ' בוועדות')) : null,
+        info.holidays.length ? h('span', { class: 'kn-cal-holiday', title: info.holidays.join(', ') }, info.holidays[0]) : null);
+    }
+
+    // A plenum sitting on the chosen day: its topics (loaded with the sitting's agenda) and links.
+    function calendarSittingCard(sitting, now) {
+      const start = toDate(sitting.StartDate);
+      const topics = h('div', { class: 'kn-cal-topics' }, h('p', { class: 'muted' }, 'טוען את סדר היום…'));
+      const title = h('div', { class: 'kn-card-title' },
+        h('span', { class: 'kn-kind plenum' }, 'מליאה'),
+        h('strong', null, sitting.Number ? `ישיבה ${sitting.Number}` : 'ישיבת המליאה'),
+        sitting.planned || start > now ? badge('מתוכננת', 'muted') : null,
+        sitting.votes ? h('span', { class: 'muted' }, count(sitting.votes, 'הצבעה אחת', 'הצבעות')) : null);
+      const actions = h('div', { class: 'kn-card-actions' },
+        button('סדר היום המלא', () => openPlenum(sitting)),
+        externalLink(agendaUrl(start), 'באתר הכנסת'));
+      const card = h('article', { class: 'kn-card kn-session kn-plenum' },
+        h('div', { class: 'kn-when' }, h('b', null, time(start))),
+        h('div', { class: 'kn-what' }, title, topics, actions));
+      loadSitting(sitting).then(agenda => {
+        if (agenda.live) {
+          card.classList.add('is-live');
+          title.append(badge('מתקיימת עכשיו', 'live'));
+          actions.prepend(button('צפייה בשידור חי', watchPlenum, 'kn-btn live'));
+        }
+        topics.replaceChildren(agenda.topics.length
+          ? h('ol', { class: 'kn-items' }, agenda.topics.map(topic => {
+            const counts = topicCounts(topic);
+            return h('li', { class: agenda.live && topic.live ? 'is-now' : null }, topic.title || 'נושא',
+              counts ? h('span', { class: 'muted' }, ` · ${counts}`) : null,
+              agenda.live && topic.live ? badge('עכשיו', 'live') : null);
+          }))
+          : h('p', { class: 'muted' }, start > now ? 'סדר היום עדיין לא פורסם.' : 'לא פורסם סדר יום.'));
+      }).catch(() => topics.replaceChildren(h('p', { class: 'muted' }, 'סדר היום לא נטען. אפשר לנסות שוב ברענון.')));
+      return card;
+    }
+
+    function calendarSessionRow(session, now, liveNames) {
+      const [stateText, stateClass] = sessionState(session, now, liveNames);
+      const first = sessionItems(session)[0];
+      return h('li', { class: session.StatusID === 193 ? 'is-cancelled' : null },
+        h('button', { type: 'button', class: 'kn-row-btn', onclick: () => openSession(session) },
+          h('b', null, time(toDate(session.StartDate))),
+          h('span', null, h('strong', null, session.KNS_Committee ? session.KNS_Committee.Name : 'ועדה'), first ? ` – ${clean(first.Name)}` : ''),
+          session.StatusID === 193 ? badge('בוטלה', 'cancelled') : stateClass === 'live' ? badge(stateText, 'live') : session.TypeDesc === 'חסויה' ? badge('חסויה', 'muted') : null));
+    }
+
+    // The chosen day under the month: holidays, recess, the plenum sitting with its topics, and the
+    // committee sessions with their first agenda item (asked for once the day is chosen).
+    function paintDay(panel, date, data, now, liveNames) {
+      const info = data.days.get(dayKey(date)) || { sittings: [], sessions: [], holidays: [] };
+      const state = workState(date, data.periods);
+      const list = h('div', { class: 'kn-cal-sessions' });
+      const sessionsView = sessions => (sessions.length
+        ? [h('h4', null, `דיונים בוועדות (${sessions.length})`), h('ul', { class: 'kn-agenda kn-cal-list' }, sessions.map(session => calendarSessionRow(session, now, liveNames)))]
+        : info.sittings.length ? [] : [empty(date.getDay() >= 5 ? 'סוף השבוע: אין דיונים.' : 'אין דיונים ביום הזה.')]);
+      list.replaceChildren(...sessionsView(info.sessions));
+      panel.replaceChildren(
+        h('div', { class: 'kn-cal-panel-head' },
+          h('h3', null, fullDayFormat.format(date)),
+          sameDay(date, now) ? badge('היום') : null,
+          h('span', { class: 'muted' }, [hebrewDate(date), ...info.holidays].filter(Boolean).join(' · '))),
+        state === 'recess' ? explain('הכנסת בפגרה: המליאה לא מתכנסת, אבל ועדות יכולות להמשיך לעבוד.') : null,
+        state === 'between' ? explain('בין כנסות: הכנסת הקודמת סיימה את עבודתה והכנסת החדשה עוד לא הושבעה. בתקופה הזאת מתקיימות הבחירות.') : null,
+        info.sittings.map(sitting => calendarSittingCard(sitting, now)),
+        list);
+      if (info.sessions.length) {
+        loadDaySessions(date).then(rows => {
+          if (list.isConnected && view.calDay && sameDay(view.calDay, date) && rows.length) list.replaceChildren(...sessionsView(rows));
+        }).catch(() => {});
+      }
+    }
+
+    // A month at a glance: every day with its plenum sitting, the number of committee sessions,
+    // holidays and recess. Choosing a day shows it in full below.
+    async function renderCalendar(force) {
+      const now = new Date();
+      const month = view.calMonth || new Date(now.getFullYear(), now.getMonth(), 1);
+      const year = month.getFullYear();
+      const index = month.getMonth();
+      const thisMonth = now.getFullYear() === year && now.getMonth() === index;
+      const [data, siteCommittees] = await Promise.all([loadMonth(year, index, force), loadSiteCommittees(force).catch(() => [])]);
+      const liveNames = liveCommitteeNames(siteCommittees);
+      if (!view.calDay || view.calDay.getFullYear() !== year || view.calDay.getMonth() !== index) {
+        view.calDay = thisMonth ? startOfDay(now) : new Date(year, index, 1);
+      }
+      const move = (target, day = null, focus = false) => {
+        view.calMonth = new Date(target.getFullYear(), target.getMonth(), 1);
+        view.calDay = day;
+        view.calFocus = focus;
+        render();
+      };
+      const fragment = h('div', { class: 'kn-page kn-calendar' });
+      fragment.append(h('div', { class: 'kn-cal-head' },
+        h('button', { type: 'button', class: 'kn-btn kn-cal-move', title: 'החודש הקודם', 'aria-label': 'החודש הקודם', onclick: () => move(new Date(year, index - 1, 1)) }, '→'),
+        h('div', { class: 'kn-cal-title' }, h('h3', null, monthFormat.format(month)), h('span', { class: 'muted' }, hebrewMonthRange(year, index))),
+        h('button', { type: 'button', class: 'kn-btn kn-cal-move', title: 'החודש הבא', 'aria-label': 'החודש הבא', onclick: () => move(new Date(year, index + 1, 1)) }, '←'),
+        thisMonth ? null : button('לחודש הנוכחי', () => move(now, startOfDay(now)), 'kn-btn small')));
+      fragment.append(h('p', { class: 'kn-cal-sum' }, [
+        count(data.sittings, 'ישיבת מליאה אחת', 'ישיבות מליאה'),
+        count(data.sessions - data.cancelled, 'דיון אחד בוועדות', 'דיונים בוועדות'),
+        data.cancelled ? count(data.cancelled, 'דיון אחד בוטל', 'דיונים בוטלו') : '',
+        data.votes ? count(data.votes, 'הצבעה אחת במליאה', 'הצבעות במליאה') : '',
+      ].filter(Boolean).join(' · ')));
+      fragment.append(h('ul', { class: 'kn-cal-legend', 'aria-label': 'מקרא' },
+        h('li', null, h('i', { class: 'plenum' }), 'ישיבת מליאה'),
+        h('li', null, h('i', { class: 'cmt' }), 'דיונים בוועדות'),
+        h('li', null, h('i', { class: 'holiday' }), 'חג או מועד'),
+        h('li', null, h('i', { class: 'recess' }), 'פגרה')));
+
+      const grid = h('div', { class: 'kn-cal', role: 'group', 'aria-label': monthFormat.format(month) });
+      for (const name of WEEKDAYS) grid.append(h('div', { class: 'kn-cal-wd', 'aria-hidden': 'true' }, name));
+      for (let i = 0; i < month.getDay(); i++) grid.append(h('div', { class: 'kn-cal-pad', 'aria-hidden': 'true' }));
+      for (let date = new Date(year, index, 1); date.getMonth() === index; date = new Date(year, index, date.getDate() + 1)) {
+        grid.append(calendarCell(date, data, now));
+      }
+      const panel = h('section', { class: 'kn-section kn-cal-panel' });
+      const choose = (date, focus) => {
+        view.calDay = date;
+        for (const cell of grid.querySelectorAll('.kn-cal-day')) {
+          const on = cell.dataset.day === dayKey(date);
+          cell.classList.toggle('is-selected', on);
+          cell.setAttribute('aria-pressed', String(on));
+          cell.tabIndex = on ? 0 : -1;
+          if (on && focus) cell.focus();
+        }
+        paintDay(panel, date, data, now, liveNames);
+      };
+      grid.addEventListener('click', event => {
+        const cell = event.target.closest('.kn-cal-day');
+        if (!cell) return;
+        const [y, m, d] = cell.dataset.day.split('-').map(Number);
+        choose(new Date(y, m - 1, d), false);
+        // On a phone the day is below the month: bring it into sight.
+        if (panel.getBoundingClientRect().top > main.getBoundingClientRect().bottom - 120) panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+      grid.addEventListener('keydown', event => {
+        if (!event.target.closest('.kn-cal-day')) return;
+        // Right to left: the left arrow is the next day.
+        const step = { ArrowLeft: 1, ArrowRight: -1, ArrowDown: 7, ArrowUp: -7 }[event.key];
+        if (!step) return;
+        event.preventDefault();
+        const date = new Date(view.calDay.getFullYear(), view.calDay.getMonth(), view.calDay.getDate() + step);
+        if (date.getFullYear() === year && date.getMonth() === index) choose(date, true);
+        else move(date, date, true);
+      });
+      fragment.append(h('div', { class: 'kn-cal-wrap' }, grid), panel);
+      paintDay(panel, view.calDay, data, now, liveNames);
+      if (view.calFocus) {
+        view.calFocus = false;
+        requestAnimationFrame(() => grid.querySelector('.kn-cal-day.is-selected')?.focus());
+      }
+      return fragment;
     }
 
     /* ---------- Votes ---------- */
@@ -1019,10 +1694,15 @@
 
     function openBill(bill) {
       openDetail('הצעת חוק', async () => {
-        const [data, statuses] = await Promise.all([site(`LegislationItem/GetLegislationBillItem?ItemId=${bill.Id}`), loadStatuses().catch(() => new Map())]);
+        // A bill opened from the plenum's agenda comes without its stage: the open data has it.
+        const [data, statuses, row] = await Promise.all([
+          site(`LegislationItem/GetLegislationBillItem?ItemId=${bill.Id}`),
+          loadStatuses().catch(() => new Map()),
+          bill.StatusID == null ? odata(`KNS_Bill?$filter=Id eq ${bill.Id}&$select=StatusID,SubTypeDesc`, 1).then(rows => rows[0] || null).catch(() => null) : null,
+        ]);
         const general = data.general || {};
-        const subType = clean(general.SubType) || clean(bill.SubTypeDesc);
-        const statusId = bill.StatusID;
+        const subType = clean(general.SubType) || clean(bill.SubTypeDesc) || clean(row && row.SubTypeDesc);
+        const statusId = bill.StatusID ?? (row ? row.StatusID : undefined);
         const { stages, index, ending } = billProgress(statusId, subType);
         const sessions = (data.sessionAndDocs && data.sessionAndDocs.Sessions) || [];
         const docs = data.sessionAndDocs ? [...(data.sessionAndDocs.DraftLaws || []), ...(data.sessionAndDocs.DocumentsAccompanyingBills || []), ...(data.sessionAndDocs.LegalDocuments || []), ...(data.sessionAndDocs.GovernmentDocuments || [])] : [];
@@ -1235,6 +1915,7 @@
 
     const RENDERERS = {
       today: renderToday,
+      calendar: renderCalendar,
       committees: renderCommittees,
       plenum: renderPlenum,
       votes: renderVotes,

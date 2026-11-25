@@ -59,9 +59,13 @@ builds and tests the same way but publishes nothing:
    Android page on a phone (dark and light colors) and a tablet and as the Windows dashboard,
    against the Knesset's live services: every tab and detail, the back gesture, watching and
    recordings handed to the app, nothing wider than the screen, no script errors, no request to a
-   blocked site. A small server stands in for the apps' fetch bridges with the same rules, and
-   requests anywhere but the Knesset are refused. When the Knesset doesn't answer GitHub's
-   machines, missing data is a warning. Screenshots: the run's `knesset-web` artifact.
+   blocked site. The plenum's agenda is compared with the same sitting straight from the Knesset
+   (every item, summary, "בתמיכת הממשלה" and presenter or answerer), and its "read more", speakers
+   and search are tried; the calendar must show this month under the right weekdays with today
+   chosen, a plenum day's topics, and working month arrows and arrow keys. A small server stands in
+   for the apps' fetch bridges with the same rules, and requests anywhere but the Knesset are
+   refused. When the Knesset doesn't answer GitHub's machines, missing data is a warning.
+   Screenshots: the run's `knesset-web` artifact.
 4. **publish** (main and tags only): if the Android job and the Knesset view test passed, a
    **pre-release** named "News Center build N" (tag
    `build-N`) with `news-center-N.apk`, `mapping-N.zip`, the Windows zip (if that job passed) and the

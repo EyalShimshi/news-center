@@ -1,32 +1,40 @@
-## News Center 1.3.0
+## News Center 1.4.0
 
-**Take a channel out of the app**: on Windows into a window of its own, to put anywhere; on Android
-into a floating window.
+The Knesset view gets **the plenum's full agenda** and **a calendar**, in both apps.
 
-### Windows (`news-center-windows-v1.3.0.zip`)
+### Windows and Android (the Knesset view, `K` on Windows, the Knesset tab on Android)
 
-- **A channel in its own window.** Point at a channel and press its new **own window** button (next
-  to fullscreen), or select it and press `D`. The channel leaves the grid for an ordinary window
-  that you can put anywhere (another monitor, beside other apps) and size as you like.
-  - Its **M**, **S**, volume and "hear only this" work there, and its sound follows the same mixer
-    as the grid, both ways.
-  - The **pin** (`T`) keeps the window on top of other windows; `F` or a double-click fills its
-    monitor, and `Esc` brings the window back.
-  - The window's back button (`D`), or closing the window, puts the channel back in the grid.
-  - When the channel goes off air its window closes, and it comes back with the channel. After a
-    restart, channels reopen in their own windows, where you left them.
-- The "News Center" name in the title bar no longer spills over the layout buttons when the window
-  is narrow and inactive.
+- **מליאה (Plenum): the full agenda**, as the Knesset publishes it on its agenda page, for the
+  current sitting (today's, else the next one once its agenda is out, else the last one), topic by
+  topic. Every item shows:
+  - its letter and name, and its number (פ/… for a private bill, כ-… for a committee's);
+  - **בתמיכת הממשלה** when the government supports it;
+  - the initiators, and the committee that prepared it;
+  - who presents it or gives its reasons, and who answers for the government;
+  - the secretariat's notes (an exemption from the tabling period, combined answers, attached bills,
+    one vote for several items);
+  - the **summary (תקציר)**, cut to three lines until you open it (or open them all at once), with
+    the legal adviser's notes, such as a required majority of 61;
+  - the text of the bill or question, extra documents, the bill's legislative stages, its votes,
+    and its speakers with their minutes.
+- **While the plenum sits**: the topic and item being discussed, who is speaking now and who's
+  next, which items are done, and a button to jump to the current item. The page refreshes itself
+  every minute, keeping what you opened. Today's page shows the same on its plenum card.
+- Arrows move to earlier and later sittings; a long agenda has a search. Items taken off the agenda
+  are struck through. A sitting's details now show this agenda too, beside its votes, tabled bills
+  and record.
+- **לוח שנה (Calendar)**, a new tab: a month at a glance, with the Hebrew dates. Each day shows
+  the plenum sitting and its time, how many committee sessions there are, holidays, and the
+  Knesset's recess. The month's totals are at the top. Choose a day (tap, click or arrow keys) to see
+  its sitting with its topics and every committee session with its agenda, and move between months
+  with the arrows.
+- The guide explains how to read the plenum's agenda, and the glossary has 8 new terms (55 in all),
+  such as בתמיכת הממשלה, פטור מחובת הנחה, הצמדה, מנמק ומשיב and שאילתה דחופה.
 
-Unzip and run `NewsCenter.exe` (Windows 10 or 11). See
-[DESKTOP.md](https://github.com/EyalShimshi/news-center/blob/main/DESKTOP.md).
+### Downloads
 
-### Android (`news-center-v1.3.0.apk`, Android 12 or newer)
+- Windows: `news-center-windows-v1.4.0.zip` – unzip and run `NewsCenter.exe` (Windows 10 or 11). See
+  [DESKTOP.md](https://github.com/EyalShimshi/news-center/blob/main/DESKTOP.md).
+- Android: `news-center-v1.4.0.apk` (Android 12 or newer); installs over 1.3.0.
 
-- **Pop out**: a new button in a top corner of the big channel (and in fullscreen) puts it in a
-  floating window (picture-in-picture) that you can move anywhere on the screen, over other apps.
-  Tap the floating window to bring the app back. If picture-in-picture is turned off for News
-  Center in Android's settings, the app says so.
-- Installs over 1.2.0.
-
-`mapping-v1.3.0.zip` decodes Android crash reports from this version.
+`mapping-v1.4.0.zip` decodes Android crash reports from this version.

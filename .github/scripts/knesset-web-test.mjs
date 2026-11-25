@@ -283,13 +283,15 @@ async function checkFits(label) {
   check(`${label}: fits the screen`, info.page <= 1 && info.main <= 1 && info.out.length === 0, info.page > 1 || info.main > 1 || info.out.length ? JSON.stringify(info) : '', { hard: true });
 }
 
-const TABS = ['today', 'committees', 'plenum', 'votes', 'bills', 'mks', 'government', 'guide'];
+const TABS = ['today', 'calendar', 'committees', 'plenum', 'votes', 'bills', 'mks', 'government', 'guide'];
 // What to tap for a detail on each page (an expression giving the element). Today's cards also
 // have watch and recording buttons, so there it's "פרטים" (details) or a row of the week ahead.
+// The calendar's chosen day lists its committee sessions (a day that has some is chosen first).
 const OPENERS = {
   today: `[...document.querySelectorAll('${ROOT_SEL} .kn-main .kn-card .kn-btn')].find(b => b.textContent.trim() === 'פרטים') || document.querySelector('${ROOT_SEL} .kn-main .kn-agenda .kn-row-btn')`,
+  calendar: `(() => { const row = () => document.querySelector('${ROOT_SEL} .kn-main .kn-cal-panel .kn-row-btn'); if (!row()) document.querySelector('${ROOT_SEL} .kn-main .kn-cal-day.has-cmt')?.click(); return row(); })()`,
   committees: `document.querySelector('${ROOT_SEL} .kn-main .kn-tile')`,
-  plenum: `document.querySelector('${ROOT_SEL} .kn-main .kn-sittings .kn-row-btn')`,
+  plenum: `document.querySelector('${ROOT_SEL} .kn-main .kn-sittings li:not(.is-planned) .kn-row-btn')`,
   votes: `document.querySelector('${ROOT_SEL} .kn-main .kn-votes .kn-row-btn')`,
   bills: `document.querySelector('${ROOT_SEL} .kn-main .kn-bill')`,
   mks: `document.querySelector('${ROOT_SEL} .kn-main .kn-mk')`,
@@ -333,6 +335,156 @@ async function openDetailOf(label, tab, { back }) {
   return detail;
 }
 
+/* ---------- The plenum's agenda and the calendar ---------- */
+
+const keyOf = date => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+
+// The plenum page shows a sitting's agenda in full: compared with the same sitting straight from the
+// Knesset's website API – every item, every summary, every "בתמיכת ממשלה" – then the summary's
+// "read more", the speakers and the agenda's search.
+async function checkAgenda(label) {
+  const info = await evaluate(`(() => {
+    const section = document.querySelector('${ROOT_SEL} .kn-main .kn-featured');
+    if (!section) return null;
+    const links = [...section.querySelectorAll('.kn-item-actions a')];
+    return {
+      session: Number(section.dataset.session),
+      title: section.querySelector('h3')?.textContent.trim() || '',
+      topics: section.querySelectorAll('.kn-topic').length,
+      items: section.querySelectorAll('.kn-item').length,
+      summaries: section.querySelectorAll('.kn-summary-text').length,
+      gov: section.querySelectorAll('.kn-item .kn-badge.gov').length,
+      roles: section.querySelectorAll('.kn-item-roles').length,
+      speakers: section.querySelectorAll('.kn-speakers').length,
+      docs: links.filter(a => /^https:\\/\\/fs\\.knesset\\.gov\\.il\\/[^/]/.test(a.href)).length,
+      badDocs: links.filter(a => /%5C|\\\\/i.test(a.href) || /^https:\\/\\/[^/]+\\/\\//.test(a.href)).map(a => a.href).slice(0, 2),
+    };
+  })()`);
+  if (!info) {
+    check(`${label}: the plenum page shows a sitting's agenda`, false, 'no agenda on the page');
+    return;
+  }
+  check(`${label}: the plenum page shows a sitting's agenda`, info.topics > 0, `${info.title}: ${info.topics} topics, ${info.items} items`);
+  check(`${label}: document links are clean addresses`, info.badDocs.length === 0, info.badDocs.length ? info.badDocs.join(' ') : `${info.docs} documents`, { hard: true });
+  try {
+    const rows = JSON.parse((await knessetFetch(`https://knesset.gov.il/WebSiteApi/knessetapi/Plenum/GetSessionData?SessionId=${info.session}`)).text);
+    const expected = {
+      items: rows.length,
+      summaries: rows.filter(row => String(row.Summery || '').replace(/\*[^*]{4,}\*/g, '').trim()).length,
+      gov: rows.filter(row => /תמיכת\s+ה?ממשלה/.test(row.SecretaryNotes || '')).length,
+      roles: rows.filter(row => row.Presenter || row.Reasoner || row.Answer).length,
+    };
+    check(`${label}: every agenda item is listed`, info.items === expected.items, `${info.items} of ${expected.items}`);
+    check(`${label}: every summary (תקציר) is shown`, info.summaries === expected.summaries, `${info.summaries} of ${expected.summaries}`);
+    check(`${label}: government support is marked`, info.gov === expected.gov, `${info.gov} of ${expected.gov}`);
+    check(`${label}: who presents and who answers`, info.roles === expected.roles, `${info.roles} of ${expected.roles}`);
+  } catch (error) {
+    check(`${label}: the agenda matches the Knesset's`, false, error.message, { soft: true });
+  }
+
+  const more = await evaluate(`(() => {
+    const button = [...document.querySelectorAll('${ROOT_SEL} .kn-featured .kn-more-btn')].find(b => b.offsetParent !== null);
+    if (!button) return null;
+    const text = button.closest('.kn-item').querySelector('.kn-summary-text');
+    const before = text.scrollHeight - text.clientHeight;
+    button.click();
+    const after = text.scrollHeight - text.clientHeight;
+    return { before, after, label: button.textContent };
+  })()`);
+  if (more) check(`${label}: a long summary opens in full`, more.before > 2 && more.after <= 1 && more.label === 'פחות', JSON.stringify(more), { hard: true });
+
+  const speakers = await evaluate(`(() => {
+    const list = [...document.querySelectorAll('${ROOT_SEL} .kn-featured details.kn-more')].find(d => d.querySelector('.kn-speakers'));
+    if (!list) return null;
+    list.open = true;
+    return { label: list.querySelector('summary').textContent, shown: list.querySelectorAll('.kn-speakers li').length, visible: list.querySelector('.kn-speakers').getBoundingClientRect().height > 0 };
+  })()`);
+  if (speakers) check(`${label}: an item's speakers open`, speakers.shown > 0 && speakers.visible, JSON.stringify(speakers), { hard: true });
+
+  const search = await evaluate(`(() => {
+    const input = document.querySelector('${ROOT_SEL} .kn-featured .kn-search');
+    if (!input) return null;
+    const items = [...document.querySelectorAll('${ROOT_SEL} .kn-featured .kn-item')];
+    const name = items[0].querySelector('.kn-item-name').textContent;
+    const word = name.split(/\\s+/).filter(w => w.length >= 4).sort((a, b) => b.length - a.length)[0] || name;
+    input.value = word;
+    input.dispatchEvent(new Event('input'));
+    const shown = items.filter(item => !item.hidden).length;
+    const first = !items[0].hidden;
+    input.value = '';
+    input.dispatchEvent(new Event('input'));
+    return { word, total: items.length, shown, first, back: items.filter(item => !item.hidden).length };
+  })()`);
+  if (search) check(`${label}: the agenda's search finds an item`, search.first && search.shown >= 1 && search.shown <= search.total && search.back === search.total, JSON.stringify(search), { hard: true });
+}
+
+// The calendar: this month under the right weekdays, today marked and chosen, the Knesset's days,
+// a plenum day in full, the month's arrows and the keyboard.
+async function checkCalendar(label, { full }) {
+  const now = new Date();
+  const info = await evaluate(`(() => {
+    const root = document.querySelector('${ROOT_SEL} .kn-main');
+    return {
+      weekdays: root.querySelectorAll('.kn-cal-wd').length,
+      days: root.querySelectorAll('.kn-cal-day').length,
+      pads: root.querySelectorAll('.kn-cal-pad').length,
+      today: root.querySelector('.kn-cal-day.is-today')?.dataset.day || '',
+      selected: root.querySelector('.kn-cal-day.is-selected')?.dataset.day || '',
+      plenum: root.querySelectorAll('.kn-cal-day.has-plenum').length,
+      committees: root.querySelectorAll('.kn-cal-day.has-cmt').length,
+      title: root.querySelector('.kn-cal-title h3')?.textContent || '',
+      hebrew: root.querySelector('.kn-cal-title .muted')?.textContent || '',
+      panel: root.querySelector('.kn-cal-panel h3')?.textContent || '',
+    };
+  })()`);
+  const length = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  const firstWeekday = new Date(now.getFullYear(), now.getMonth(), 1).getDay();
+  check(`${label}: the calendar shows this month`, info.weekdays === 7 && info.days === length && info.pads === firstWeekday, `${info.title} (${info.hebrew}): ${info.days} days, ${info.pads} blank before the 1st`, { hard: true });
+  check(`${label}: today is marked and chosen`, info.today === keyOf(now) && info.selected === keyOf(now) && Boolean(info.panel), `${info.today} · ${info.panel}`, { hard: true });
+  check(`${label}: the month has the Knesset's days`, info.plenum + info.committees > 0, `${info.plenum} plenum days, ${info.committees} days with committees`, { soft: true });
+  if (!full) return;
+
+  // A plenum day: the sitting's card fills in its topics.
+  const plenumDay = await evaluate(`(() => { const day = [...document.querySelectorAll('${ROOT_SEL} .kn-cal-day.has-plenum')].pop(); if (!day) return ''; day.click(); return day.dataset.day; })()`);
+  if (plenumDay) {
+    const card = await waitFor(() => evaluate(`(() => {
+      const card = document.querySelector('${ROOT_SEL} .kn-cal-panel .kn-plenum');
+      const topics = card && card.querySelector('.kn-cal-topics');
+      if (!topics || /טוען/.test(topics.textContent)) return null;
+      return { topics: topics.querySelectorAll('li').length, text: topics.textContent.trim().slice(0, 60), chosen: document.querySelector('${ROOT_SEL} .kn-cal-day.is-selected')?.dataset.day };
+    })()`), 30000, "the sitting's topics").catch(() => null);
+    check(`${label}: a plenum day shows its sitting's topics`, Boolean(card && card.chosen === plenumDay && (card.topics > 0 || card.text)), JSON.stringify(card));
+    await shot(`${label}-calendar-day`);
+    await checkFits(`${label} calendar day`);
+  }
+
+  // The keyboard: right to left, the left arrow is the next day.
+  const keys = await evaluate(`(() => {
+    const cell = document.querySelector('${ROOT_SEL} .kn-cal-day.is-selected');
+    const before = cell.dataset.day;
+    cell.focus();
+    cell.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+    return { before, after: document.querySelector('${ROOT_SEL} .kn-cal-day.is-selected')?.dataset.day || '' };
+  })()`);
+  const [y, m, d] = keys.before.split('-').map(Number);
+  const previous = keyOf(new Date(y, m - 1, d - 1));
+  check(`${label}: the right arrow goes to the day before`, keys.after === previous || (d === 1 && Boolean(keys.after)), JSON.stringify(keys), { hard: true });
+  if (d === 1) await settle(`${label} calendar after the arrow`);
+
+  // The month's arrows, and back to this month.
+  const title = () => evaluate(`document.querySelector('${ROOT_SEL} .kn-cal-title h3')?.textContent || ''`);
+  const start = await title();
+  await evaluate(`document.querySelector('${ROOT_SEL} [aria-label="החודש הבא"]').click()`);
+  await settle(`${label} next month`);
+  const next = await title();
+  await shot(`${label}-calendar-next`);
+  await evaluate(`[...document.querySelectorAll('${ROOT_SEL} .kn-cal-head .kn-btn')].find(b => b.textContent.trim() === 'לחודש הנוכחי')?.click()`);
+  await settle(`${label} this month again`);
+  const back = await title();
+  const thisMonth = await evaluate(`new Intl.DateTimeFormat('he-IL', { month: 'long', year: 'numeric' }).format(new Date())`);
+  check(`${label}: the month's arrows move and come back`, next !== start && back === thisMonth, `${start} → ${next} → ${back}`, { hard: true });
+}
+
 /* ---------- Android: phone and tablet ---------- */
 
 async function androidRun(label, size, theme, { full }) {
@@ -353,18 +505,20 @@ async function androidRun(label, size, theme, { full }) {
   const report = (await messages()).find(m => m.type === 'log');
   check(`${label}: reports its first page to the app`, Boolean(report), report ? report.text.slice(0, 80) : 'no report', { hard: true });
 
-  const tabs = full ? TABS : ['today', 'committees', 'mks'];
+  const tabs = full ? TABS : ['today', 'calendar', 'plenum', 'committees', 'mks'];
   for (const tab of tabs) {
     try {
       await openTab(label, tab);
       await shot(`${label}-${tab}`);
       await checkFits(`${label} ${tab}`);
-      if (full && (tab === 'today' || tab === 'mks' || tab === 'bills')) {
+      if (full && ['today', 'mks', 'bills', 'plenum', 'calendar'].includes(tab)) {
         await evaluate(`document.querySelector('${ROOT_SEL} .kn-main').scrollTop = innerHeight * 0.85`);
         await sleep(400);
         await shot(`${label}-${tab}-2`);
         await evaluate(`document.querySelector('${ROOT_SEL} .kn-main').scrollTop = 0`);
       }
+      if (tab === 'plenum') await checkAgenda(label);
+      if (tab === 'calendar') await checkCalendar(label, { full });
       if (tab === 'today') {
         const live = await evaluate(`(() => { const el = document.querySelector('${ROOT_SEL} .kn-live'); if (!el) return ''; el.click(); return el.innerText.replace(/\\s+/g, ' ').trim(); })()`);
         await sleep(300);
@@ -453,10 +607,15 @@ async function desktopRun() {
   await evaluate('document.querySelector("#toggle-knesset").click()');
   check(`${label}: the Knesset button opens the view`, await waitFor(() => evaluate(`!document.querySelector('${ROOT_SEL}').hidden`), 5000, 'the view'), '', { hard: true });
   check(`${label}: the view has its close button`, await evaluate(`Boolean(document.querySelector('${ROOT_SEL} .kn-actions [title^="חזרה לערוצים"]'))`), '', { hard: true });
-  for (const tab of ['today', 'committees', 'votes']) {
+  for (const tab of ['today', 'calendar', 'plenum', 'committees', 'votes']) {
     try {
       await openTab(label, tab);
       await shot(`${label}-${tab}`);
+      if (tab === 'plenum') {
+        await checkAgenda(label);
+        await shot(`${label}-plenum-open`);
+      }
+      if (tab === 'calendar') await checkCalendar(label, { full: true });
       if (tab !== 'today') await openDetailOf(label, tab, { back: true });
       // Esc closes the details first (with nothing open it would close the whole view).
       if (await detailOpen()) await evaluate('document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", code: "Escape", bubbles: true }))');
