@@ -117,7 +117,8 @@ Speakers match an item by its internal ID while the sitting is on
 (`SessionItemId` = `FK_InternalSessionItemId`), and afterwards by its topic and session item
 (`TitleId` and `SessionItemId` = `FK_SessionItemId`). Extra documents match by `FK_Item_Id` =
 `FK_ItemID`. A finished sitting's votes reach the open data within hours; during the sitting there
-are none yet.
+are none yet. A coming sitting can have items in `GetSessionData` days before `GetAgendaPlenum` has
+its topics' titles; the view then names a topic by its items' kind ("נאומים והודעות", "הצעות חוק").
 
 ### For a calendar
 

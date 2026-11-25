@@ -44,6 +44,9 @@
 
   const ITEM_TYPES = { 1: 'שאילתה', 2: 'הצעת חוק', 3: 'הצעת אי-אמון', 4: 'הצעה לסדר היום', 5: 'ישיבת מליאה', 9: 'דברים במליאה', 11: 'נושא לדיון', 6000: 'פעולה על פי חוק', 6002: 'הצעת חוק', 6003: 'חוק' };
 
+  // A name for a plenum topic whose title isn't out yet (its items are), by the kind of its items.
+  const TOPIC_KINDS = { 1: 'שאילתות', 2: 'הצעות חוק', 3: 'הצעות להביע אי-אמון בממשלה', 4: 'הצעות לסדר היום', 9: 'נאומים והודעות', 6000: 'הודעות ופעולות על פי חוק' };
+
   const VOTE_RESULTS = { 7: ['בעד', 'for'], 8: ['נגד', 'against'], 6: ['נמנע (נוכח)', 'abstain'] };
 
   const POSITION_ROLES = {
@@ -1054,7 +1057,7 @@
         .slice().sort((a, b) => (a.Ordinal || 0) - (b.Ordinal || 0))
         .map(topic => ({ id: topic.TitleId, title: clean(topic.Title), live: Boolean(topic.IsLive), finish: toDate(topic.FinishTime) }));
       for (const row of items) {
-        if (!list.some(topic => topic.id === row.TitleId)) list.push({ id: row.TitleId, title: '', live: false, finish: null });
+        if (!list.some(topic => topic.id === row.TitleId)) list.push({ id: row.TitleId, title: TOPIC_KINDS[row.LU_ItemType] || '', live: false, finish: null });
       }
       for (const topic of list) topic.items = items.filter(row => row.TitleId === topic.id).map(row => agendaItem(row, speakerRows, docRows));
       const live = list.some(topic => topic.live) || items.some(row => row.IsLive);
@@ -1140,8 +1143,7 @@
       ].filter(Boolean);
       fill(li,
         h('div', { class: 'kn-item-head' },
-          item.letter ? h('span', { class: 'kn-letter' }, `${item.letter}.`) : null,
-          h('strong', { class: 'kn-item-name' }, item.name),
+          h('strong', { class: 'kn-item-name' }, item.letter ? h('span', { class: 'kn-letter' }, `${item.letter}. `) : null, item.name),
           live && item.live ? badge('עכשיו בדיון', 'live') : null,
           live && item.done && !item.live ? badge('נדון', 'done') : null,
           item.active ? null : badge('ירד מסדר היום', 'cancelled'),
