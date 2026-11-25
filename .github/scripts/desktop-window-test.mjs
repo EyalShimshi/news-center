@@ -213,7 +213,9 @@ const tileIn = (page, id) => page.eval(`Boolean(document.querySelector('.tile[da
 async function connectMain() {
   const target = await waitFor(mainTarget, 60000, 'the main window');
   const page = await Page.open(target);
-  await waitFor(() => page.eval('document.readyState === "complete" && Boolean(document.querySelector(".statusbar"))'), 30000, 'the dashboard');
+  // Past loading is enough: "complete" waits for every frame, and with the default channels that
+  // includes Mako's page, which can take long (build 23).
+  await waitFor(() => page.eval('document.readyState !== "loading" && Boolean(document.querySelector(".statusbar"))'), 30000, 'the dashboard');
   return page;
 }
 
@@ -261,7 +263,7 @@ try {
   })()`);
   await main.send('Page.reload');
   await sleep(1500);
-  await waitFor(() => main.eval('document.readyState === "complete" && Boolean(document.querySelector(".statusbar"))'), 30000, 'the dashboard after the reload');
+  await waitFor(() => main.eval('document.readyState !== "loading" && Boolean(document.querySelector(".statusbar"))'), 30000, 'the dashboard after the reload');
   check('test channel set up', seed >= 0, `${seed} built-in channels set aside`);
 
   const codecs = await main.eval('typeof MediaSource !== "undefined" && MediaSource.isTypeSupported(\'video/mp4; codecs="avc1.64001f,mp4a.40.2"\')');
