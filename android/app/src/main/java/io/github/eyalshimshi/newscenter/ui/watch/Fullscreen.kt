@@ -33,6 +33,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -170,6 +171,12 @@ private fun FullscreenControls(
                 onToggleSolo = onToggleSolo,
                 size = 40.dp,
             )
+            val popOut = LocalPopOut.current
+            if (popOut != null && !channel.isPage) {
+                IconButton(onClick = popOut) {
+                    Icon(AppIcons.PictureInPictureAlt, contentDescription = stringResource(R.string.action_pop_out), tint = Color.White)
+                }
+            }
         }
         if (!channel.isPage) {
             Row(
@@ -189,6 +196,13 @@ private fun FullscreenControls(
         }
     }
 }
+
+/**
+ * The pop-out button's action: the app goes into a floating picture-in-picture window with the
+ * channel on the big screen, a window the user can move anywhere on the screen (on Android, the way
+ * to take a channel out of the app). Null where the device has no picture-in-picture.
+ */
+val LocalPopOut = staticCompositionLocalOf<(() -> Unit)?> { null }
 
 /** Picture-in-picture: just the spotlight channel's picture. */
 @Composable

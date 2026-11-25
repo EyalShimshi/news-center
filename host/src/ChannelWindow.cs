@@ -180,7 +180,11 @@ sealed class ChannelWindow : Form
 
     protected override void OnFormClosing(FormClosingEventArgs e)
     {
-        if (e.CloseReason is CloseReason.WindowsShutDown or CloseReason.TaskManagerClosing or CloseReason.ApplicationExitCall) closingByApp = true;
+        // Windows shutting down takes News Center with it, so the channel stays in its own window
+        // for next time. Any other close News Center didn't ask for puts the channel back in the
+        // grid: the window's X, Alt+F4, the taskbar, and other programs too (Windows Forms reports
+        // a close from another program, such as Task Manager, as TaskManagerClosing).
+        if (e.CloseReason is CloseReason.WindowsShutDown or CloseReason.ApplicationExitCall) closingByApp = true;
         var maximized = fullscreen ? maximizedBeforeFullscreen : WindowState == FormWindowState.Maximized;
         var bounds = fullscreen ? boundsBeforeFullscreen : WindowState == FormWindowState.Normal ? Bounds : RestoreBounds;
         ChannelWindowPlacement.Save(ChannelId, bounds, maximized, TopMost);

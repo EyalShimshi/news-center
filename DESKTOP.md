@@ -7,7 +7,8 @@ A desktop multiview dashboard for live TV. It plays several channels side by sid
 in its own window, with mixer-style **M** (mute) and **S** (solo) buttons, a
 volume slider that goes up to 200%, a live audio meter for every channel, a
 News panel with headlines from the news sites you pick, and a **Knesset view**
-that explains the Knesset's day in plain Hebrew.
+that explains the Knesset's day in plain Hebrew. Any channel can also move out
+to a window of its own, to put anywhere.
 
 ## Start
 
@@ -16,7 +17,7 @@ unzip it anywhere and double-click `NewsCenter.exe` (or build it yourself with `
 WebView2 Runtime and .NET Framework 4.8, both of which are part of Windows 11.
 Starting it again while it is open brings the existing window forward.
 
-Settings, the window position and the browser cache are kept in
+Settings, the window positions and the browser cache are kept in
 `%LOCALAPPDATA%\NewsCenter`.
 
 ## The window
@@ -181,6 +182,31 @@ mouse to the top edge to bring back the title bar, press `1`–`9` or `←` `→
 switch channels, and press `Esc` to return to the grid. Meters are hidden in
 fullscreen.
 
+## A channel in its own window
+
+Point at a channel and press its **own window** button (next to fullscreen), or
+select it and press `D`: the channel leaves the grid for a window of its own,
+which you can put anywhere – on another monitor, beside other apps or on top of
+them – and size as you like. The window has the channel's **M**, **S** and volume
+controls, and the round button in its middle makes it the only channel you hear.
+Its sound follows the same rules as the grid, both ways: muting, soloing or
+"hear only this" in either window changes both.
+
+- The **pin** (`T`) keeps the window on top of other windows.
+- `F`, double-clicking the picture, or the fullscreen button fills the window's
+  monitor with the channel; `Esc` brings the window back.
+- The window's **back** button (`D`), or closing the window, puts the channel
+  back in the grid.
+- When the channel goes off air its window closes, and it opens again when the
+  channel is back on air. After a restart, channels that were in their own
+  windows open in them again, where you left them (and pinned if they were).
+- Closing News Center closes these windows too. In the channel manager such a
+  channel says *in its own window*, and watching it from the Knesset view brings
+  its window forward.
+
+In a channel's window, `M`, `S`, `Enter`, `↑` `↓`, `V` and `R` work as in the
+grid.
+
 ## Keyboard
 
 | Key | Action |
@@ -192,6 +218,8 @@ fullscreen.
 | `Shift`+`S` | Solo only the selected channel |
 | `↑` `↓` | Volume of the selected channel |
 | `F` | Fill the window with the selected channel |
+| `D` | Put the selected channel in its own window (in that window: back to the grid) |
+| `T` | In a channel's own window: keep it on top of other windows |
 | `P` | Spotlight the selected channel |
 | `G` | Switch between Grid and Spotlight |
 | `+` `−`, `Ctrl`+wheel | Bigger or smaller tiles |
@@ -230,7 +258,7 @@ channel list as JSON. To ship a channel with the project, add it to
 | `app/` | The dashboard: `index.html`, `styles.css`, `app.js`, `channels.js` (built-in channels), `news.js` (built-in news sources) |
 | `app/knesset.js`, `app/knesset-guide.js`, `app/knesset.css` | The Knesset view, its Hebrew guide (glossary, bill stages, links) and its styles; the Android app's Knesset tab uses the same three files |
 | `app/page-helper.js` | Runs inside web-page channels (sound, player-only view, meter) |
-| `host/src/` | C# source of the window |
+| `host/src/` | C# source of the windows: `MainForm.cs` (the main window), `ChannelWindow.cs` (a channel's own window) |
 | `host/build.cmd` | Rebuilds `NewsCenter.exe`; downloads the C# compiler and WebView2 SDK from nuget.org on first use |
 | `host/make-icon.mjs` | Regenerates `host/NewsCenter.ico` from `app/icon.svg` (needs Node.js) |
 

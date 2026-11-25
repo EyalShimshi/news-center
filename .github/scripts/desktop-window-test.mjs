@@ -159,7 +159,9 @@ public static class Desk {
   [DllImport("user32.dll")] static extern bool IsWindowVisible(IntPtr window);
   [DllImport("user32.dll")] static extern bool PostMessage(IntPtr window, uint message, IntPtr wParam, IntPtr lParam);
   [DllImport("user32.dll")] static extern int GetWindowLong(IntPtr window, int index);
-  public static string Find(string prefix, bool close) {
+  // close: 1 as the user does it (the X button, Alt+F4: WM_SYSCOMMAND SC_CLOSE), 2 as another
+  // program such as Task Manager does it (WM_CLOSE).
+  public static string Find(string prefix, int close) {
     var found = new StringBuilder();
     EnumWindows((window, data) => {
       var title = new StringBuilder(512);
@@ -167,7 +169,8 @@ public static class Desk {
       if (IsWindowVisible(window) && title.ToString().StartsWith(prefix)) {
         bool topMost = (GetWindowLong(window, -20) & 0x8) != 0;
         found.Append(title).Append(topMost ? " [on top]" : "").Append("\\n");
-        if (close) PostMessage(window, 0x10, IntPtr.Zero, IntPtr.Zero);
+        if (close == 1) PostMessage(window, 0x112, (IntPtr)0xF060, IntPtr.Zero);
+        else if (close == 2) PostMessage(window, 0x10, IntPtr.Zero, IntPtr.Zero);
       }
       return true;
     }, IntPtr.Zero);
@@ -185,14 +188,15 @@ public static class Desk {
 '@
 `;
 
-// The script goes base64-encoded, so its quotes and line breaks reach PowerShell unchanged.
+// The script goes base64-encoded, so its quotes and line breaks reach PowerShell unchanged. Without
+// progress records, PowerShell's first-use module preparation stays out of the log.
 function powershell(command) {
-  const encoded = Buffer.from(`${WINDOWS}\n${command}`, 'utf16le').toString('base64');
+  const encoded = Buffer.from(`$ProgressPreference = 'SilentlyContinue'\n${WINDOWS}\n${command}`, 'utf16le').toString('base64');
   return execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-EncodedCommand', encoded], { encoding: 'utf8' }).trim();
 }
 
-// Top-level windows whose titles start with `prefix`; with close, as if the user closed them.
-const findWindows = (prefix, close = false) => powershell(`[Desk]::Find('${prefix}', $${close})`).split('\n').filter(Boolean);
+// Top-level windows whose titles start with `prefix`; closed as the 'user' or another 'program' would.
+const findWindows = (prefix, close = '') => powershell(`[Desk]::Find('${prefix}', ${{ user: 1, program: 2 }[close] || 0})`).split('\n').filter(Boolean);
 
 function desktopShot(name) {
   try {
@@ -223,7 +227,7 @@ async function connectWindow(id, timeout = 30000) {
 async function closeApp() {
   if (!app || app.exited) return;
   try {
-    findWindows('News Center', true);
+    findWindows('News Center', 'program');
   } catch {
     // Ends below either way.
   }
@@ -290,11 +294,16 @@ try {
   }
 
   // Its sound follows the main window's mixer, both ways.
+  const heardAlone = () => own.eval('document.querySelector(".tile").classList.contains("is-focused") && document.querySelector(".focus-label").textContent === "Heard alone"');
   await own.eval('document.querySelector(".tile .ms.solo").click()');
   check('S in the window solos the channel in the main window', await waitFor(() => main.eval('document.querySelector("#any-solo").classList.contains("active")'), 5000, 'solo in the main window').catch(() => false));
   check('…and the window shows it', await waitFor(() => own.eval('document.querySelector(".tile .ms.solo").getAttribute("aria-pressed") === "true"'), 5000, 'the solo button').catch(() => false));
+  await own.eval('document.querySelector(".tile .ms.solo").click()');
+  check('S again stops soloing it', await waitFor(() => main.eval('!document.querySelector("#any-solo").classList.contains("active")'), 5000, 'no solo in the main window').catch(() => false));
   await own.eval('document.querySelector(".tile .focus-btn").click()');
-  check('"Hear only this" makes it the one heard', await waitFor(() => own.eval('document.querySelector(".tile").classList.contains("is-focused") && document.querySelector(".focus-label").textContent === "Heard alone"'), 5000, 'heard alone').catch(() => false));
+  check('"Hear only this" makes it the one heard', await waitFor(heardAlone, 5000, 'heard alone').catch(() => false));
+  await own.eval('document.querySelector(".tile .focus-btn").click()');
+  check('…and again stops soloing it', await waitFor(async () => !(await heardAlone()) && await main.eval('!document.querySelector("#any-solo").classList.contains("active")'), 5000, 'not alone').catch(() => false));
   await own.eval('document.querySelector(".tile .ms.mute").click()');
   check('M in the window mutes it', await waitFor(() => own.eval('document.querySelector(".tile .ms.mute").getAttribute("aria-pressed") === "true" && document.querySelector(".tile").classList.contains("is-silent")'), 5000, 'mute').catch(() => false));
   await own.eval('document.querySelector(".tile .ms.mute").click()');
@@ -321,12 +330,16 @@ try {
   check('…and its window closes', await waitFor(async () => !(await windowTarget(TEST.id)), 10000, 'the window to close').catch(() => false));
   own.close();
 
-  // Closing the window the way a user does (its X, Alt+F4) brings it back too.
-  await main.eval(`document.querySelector('.tile[data-id="${TEST.id}"] .detach').click()`);
-  own = await connectWindow(TEST.id);
-  findWindows(TEST.name, true);
-  check('closing the window brings the channel back', await waitFor(() => tileIn(main, TEST.id), 10000, 'the tile to return').catch(() => false));
-  own.close();
+  // Closing the window the way a user does (its X, Alt+F4) brings the channel back too, and so does
+  // another program closing it (Task Manager).
+  for (const [closer, label] of [['user', 'closing the window (X, Alt+F4)'], ['program', 'another program closing the window (Task Manager)']]) {
+    await main.eval(`document.querySelector('.tile[data-id="${TEST.id}"] .detach').click()`);
+    own = await connectWindow(TEST.id);
+    findWindows(TEST.name, closer);
+    check(`${label} brings the channel back`, await waitFor(() => tileIn(main, TEST.id), 10000, 'the tile to return').catch(() => false));
+    own.close();
+    await waitFor(async () => !(await windowTarget(TEST.id)), 10000, 'the window to close').catch(() => {});
+  }
 
   // A channel in its own window reopens there after a restart, where it was.
   await main.eval(`document.querySelector('.tile[data-id="${TEST.id}"] .detach').click()`);

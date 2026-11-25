@@ -2,9 +2,9 @@
 # Runs the release APK on an emulator before it's published. R8 removes code it thinks is unused,
 # and code that is only reached by reflection breaks only when the app runs. Opens the app, plays a
 # public test stream from a newscenter:// link (always available, whatever is on air), visits every
-# tab and Settings, goes to the home screen, and fails if the app crashes or nothing plays. Crashes
-# are shown with the original names, decoded with the build's mapping file. Screenshots
-# (smoke-*.png) are published with the build.
+# tab and Settings, pops the test stream out into a floating window and back, goes to the home
+# screen, and fails if the app crashes or nothing plays. Crashes are shown with the original names,
+# decoded with the build's mapping file. Screenshots (smoke-*.png) are published with the build.
 # Usage: smoke-test.sh <apk> <mapping.txt>
 set -u
 
@@ -205,11 +205,39 @@ else
   adb shell input keyevent KEYCODE_BACK
 fi
 
+# The pop-out button on the big channel puts it in a floating window (picture-in-picture) that can
+# go anywhere on the screen; opening News Center again brings it back.
+if [ "$(adb shell pm has-feature android.software.picture_in_picture | tr -d '\r')" = "true" ]; then
+  echo "Popping the test stream out into a floating window"
+  must_tap content-desc "Pop out to a floating window"
+  if ! wait_for_log "picture-in-picture on" 20 "while popping out"; then
+    collect_diagnostics
+    fail "The pop-out button didn't open a floating window" decoded.txt
+  fi
+  sleep 4
+  check_no_crash "in the floating window"
+  screenshot pop-out
+  adb shell am start -W -n "$pkg/.MainActivity" > /dev/null
+  if wait_for_log "picture-in-picture off" 20 "when coming back from the floating window"; then
+    echo "Opening News Center again brought it back from the floating window"
+  else
+    echo "::warning::Opening News Center again didn't bring it back from the floating window"
+  fi
+  sleep 3
+else
+  echo "::warning::This emulator has no picture-in-picture, so there is no pop-out button to test"
+fi
+
 echo "Going to the home screen (picture-in-picture)"
 adb shell input keyevent KEYCODE_HOME
 sleep 8
 check_no_crash "in the background"
 screenshot home
+if [ "$(adb logcat -d -s NewsCenter:V | grep -c 'picture-in-picture on')" -ge 2 ]; then
+  echo "Leaving the app put the test stream in a floating window"
+else
+  echo "::warning::Leaving the app didn't put the test stream in a floating window"
+fi
 
 # Stops the players so the emulator shuts down quickly.
 adb shell am force-stop "$pkg" || true

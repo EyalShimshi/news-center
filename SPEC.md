@@ -40,6 +40,7 @@ Every request so far, in order, and where it stands on each platform.
 | R20 | Never contact one news site again, no network events at all; leave no traces | ✅ (removed; blocked in the page, the fetch bridge, redirects, the browser engine and links) | ✅ (removed; blocked in the fetch layer, sources, channels, headline links, the web-page channel and the Knesset page) |
 | R21 | All the Knesset view in the APK, like in the Windows app | ✅ (the same files) | ✅ the Knesset tab ([docs/rounds/03-news-center.md](docs/rounds/03-news-center.md)) |
 | R22 | The repository is now `news-center`: change everything from the old name to the new one | ✅ | ✅ |
+| R23 | Detach a stream from the program: take it out as a separate window and put it anywhere else | ✅ its own window (`D`): any monitor, on top of other apps, fullscreen on its monitor; its sound follows the mixer ([docs/rounds/04-own-windows.md](docs/rounds/04-own-windows.md)) | ✅ adapted: a pop-out button puts the channel in a floating picture-in-picture window, which goes anywhere on the screen (D-32) |
 
 ## 3. Decision log
 
@@ -76,6 +77,11 @@ revisited.
 | D-26 | The Knesset page takes the app's Material colors (light or dark, accent or wallpaper colors) | It should look like part of the app, not a web page |
 | D-27 | The new name changes the Android package to `io.github.eyalshimshi.newscenter` (and the CI signing key), so 1.2.0 installs as a new app; the Windows app keeps its settings in a new folder | R22: nothing keeps the old name. Android can't update an app across a package change anyway, so a new key costs nothing more |
 | D-28 | CI tests the Knesset view in headless Chrome against the live services, on a phone, a tablet and the desktop, before anything is published; when the Knesset doesn't answer GitHub's machines, missing data is only a warning | The view depends on two outside services; layout and script errors must still fail the build, but the Knesset being unreachable from the cloud must not |
+| D-29 | A channel's own window is the dashboard page in single-channel mode (`index.html?channel=<id>`) in a second WebView2 that shares the main window's browser environment; the two pages talk over a `BroadcastChannel`, and the main window keeps the mixer: the window only plays what it's told and forwards its buttons | One tile and player implementation for both; one place for the sound rules, so the windows can't disagree; a shared environment means one cache and one set of browser settings. The window never saves settings, so it can't overwrite the main window's |
+| D-30 | Closing a channel's window puts the channel back in the grid, unless News Center closed it (the channel went off air, News Center is closing, Windows is shutting down); "in its own window" is saved with the channel, and each window's place (bounds, maximized, on top) in `channel-windows.json` | Closing the window is the natural way back; going off air or restarting shouldn't lose where the user put it. Windows Forms reports a close from another program, such as Task Manager, as `TaskManagerClosing`; it counts as the user's, so a channel is never left without a window (found by the CI test, D-33) |
+| D-31 | A window the user asks for comes to the front; one News Center reopens by itself (at start, back on air) doesn't take the focus | Reopening windows shouldn't take the keyboard from what the user is doing |
+| D-32 | On Android, a channel's own window is picture-in-picture, from a pop-out button on the big channel and in fullscreen, whether or not leaving the app does it (Settings) | Android gives an app one floating window, which the user can move anywhere over other apps; a second activity with its own players would compete for the app's single audio focus and the phone's few video decoders |
+| D-33 | CI runs the built `NewsCenter.exe` on the Windows runner and drives both windows through the browser's debugging port, with screenshots; the emulator test presses pop out and checks that Android entered picture-in-picture | The feature spans two windows, the host and Windows itself; only running the real program shows that the pieces fit |
 
 ## 4. Architecture (Android)
 
@@ -117,6 +123,7 @@ MainActivity ── NewsCenterApp (Compose: Watch · Channels · News · Knesset
 | Discovery every start | On ViewModel creation, every 5 minutes while visible, on returning after 5+ minutes, and on refresh | R4 |
 | Channel 12 inside the app | WebView with the page helper in every frame; volume ≤ 100%, no meter/fullscreen/PiP; the WebView is destroyed only after it has left the screen (`AndroidView.onRelease`) | D-08; a web page can't be in two places at once, and a WebView mustn't be destroyed while attached |
 | New channels and the spotlight must be visible | A new spotlight scrolls the grid to the top; channels that come on air above the top tile are shown while the grid is at its top | Lazy grids keep their first visible item in place, so items added above it appeared out of sight (found by the emulator test in build 1) |
+| Detach a stream into its own window | A pop-out button (`LocalPopOut`, provided by `MainActivity` where the device has picture-in-picture) on the big channel and in fullscreen calls `enterPictureInPictureMode`; if Android refuses (picture-in-picture turned off for the app), a message says where to turn it on | D-32 |
 
 ## 6. Known limitations
 
@@ -124,6 +131,8 @@ MainActivity ── NewsCenterApp (Compose: Watch · Channels · News · Knesset
   with a notification yet.
 - Channel 12 depends on Mako's page; if Mako shows a pop-up or needs a tap, use its player in the
   spotlight. It can't be fullscreen or picture-in-picture.
+- On Android one channel at a time can float (picture-in-picture is one window per app); on
+  Windows every channel can have its own window.
 - Some streams are geo-restricted to Israel.
 - The CI signing key lives in the Actions cache (see MAINTAINING.md).
 - The Knesset view depends on the Knesset's data services, one of them undocumented; if the Knesset

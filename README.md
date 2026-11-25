@@ -16,7 +16,8 @@ sound rules, the same news sources and the same Knesset view.
 How the Android app was made, what's in version 1.0.0 and how to try it:
 [docs/rounds/01-android-app.md](docs/rounds/01-android-app.md). The Knesset view:
 [docs/rounds/02-knesset-view.md](docs/rounds/02-knesset-view.md) (Windows) and
-[docs/rounds/03-news-center.md](docs/rounds/03-news-center.md) (Android, and the new name).
+[docs/rounds/03-news-center.md](docs/rounds/03-news-center.md) (Android, and the new name). A
+channel in its own window: [docs/rounds/04-own-windows.md](docs/rounds/04-own-windows.md).
 
 ## Channels
 
@@ -66,8 +67,10 @@ is the first under the News Center name and installs as a new app: uninstall the
 - **Rearrange**: long-press a tile and drag it. The order is the same as in Channels.
 - **Fullscreen** (⛶ on the big channel): the phone turns sideways, ⏮ ⏭ switch channels and the
   sound follows. In split screen it fills just News Center's window.
-- **Picture-in-picture**: leave the app while a channel is in the spotlight and it keeps playing in
-  a small window. Channels you can hear keep playing while you read the News tab.
+- **Pop out** (the small-window button on the big channel, or in fullscreen): the channel goes into
+  a floating window that you can move anywhere on the screen, over other apps; tap it to come back.
+  Leaving the app while a channel is in the spotlight does the same (**picture-in-picture**).
+  Channels you can hear keep playing while you read the News tab.
 - **Refresh** (↻) looks for new Knesset broadcasts, checks every channel and reloads them.
 - Grid tiles play at most 480p to save data and battery; the big channel plays at full quality
   (Settings → Save data in the grid).
@@ -126,11 +129,13 @@ default), wallpaper or accent colors, pure black, and the app's language (Hebrew
 
 A borderless window with its own title bar, a resizable multiview with Grid and Spotlight layouts,
 a News panel beside or below the channels, keyboard shortcuts for everything, and fullscreen inside
-the window. **Knesset** (`K`) opens a full-window view, in Hebrew, of the Knesset's day-to-day
-work: what's on air and on the agenda today, every committee with its members and sessions, plenum
-sittings, every vote and how each MK voted, bills with their stage in plain words, all 120 MKs
-(who's in the building now), the government, and a guide with a glossary. Live sessions open in the
-grid and recordings play in place. See [DESKTOP.md](DESKTOP.md) and, for the Knesset's data,
+the window. Any channel can move out to **a window of its own** (`D`) – on another monitor, or kept
+on top of other apps – and its sound still follows the mixer. **Knesset** (`K`) opens a
+full-window view, in Hebrew, of the Knesset's day-to-day work: what's on air and on the agenda
+today, every committee with its members and sessions, plenum sittings, every vote and how each MK
+voted, bills with their stage in plain words, all 120 MKs (who's in the building now), the
+government, and a guide with a glossary. Live sessions open in the grid and recordings play in
+place. See [DESKTOP.md](DESKTOP.md) and, for the Knesset's data,
 [docs/knesset-data.md](docs/knesset-data.md).
 
 ## Privacy
@@ -184,7 +189,10 @@ Icons (Apache-2.0).
 - **M** משתיק, **S** מעביר לסולו (אפשר כמה ערוצים בסולו – ואז שומעים רק אותם). השתקה גוברת על סולו.
 - **עוצמה עד 200%** עם מגביל, ומדי עוצמה ירוקים בכל משבצת (אפשר להסתיר).
 - **לחיצה ארוכה וגרירה** משנה את סדר המשבצות; גודל המשבצות: אחת, שתיים או שלוש בשורה.
-- **מסך מלא** עם מעבר בין ערוצים, ו**תמונה בתוך תמונה** כשיוצאים מהאפליקציה.
+- **מסך מלא** עם מעבר בין ערוצים, ו**חלון צף** (תמונה בתוך תמונה): כפתור על הערוץ הגדול מוציא אותו
+  לחלון קטן שאפשר להזיז לכל מקום במסך, וזה קורה גם כשיוצאים מהאפליקציה.
+- **ב־Windows** אפשר להוציא כל ערוץ לחלון משלו (`D`) – למסך אחר, או מעל שאר החלונות – והסאונד שלו
+  ממשיך לציית למיקסר.
 - **חדשות:** 32 מקורות בעברית ובאנגלית (חמישה פעילים בהתחלה), סינון לפי מקור, משיכה לרענון,
   והוספת כל פיד RSS או Atom.
 - **הכנסת:** מה קורה היום במליאה ובוועדות, הוועדות וחבריהן, ההצבעות ואיך הצביע כל ח״כ, הצעות החוק

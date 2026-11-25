@@ -18,6 +18,7 @@ How the project is built, released, signed and kept working. For what the apps d
 | `host/` | The Windows app's window (C#, WebView2); `host\build.cmd` builds `NewsCenter.exe` |
 | `.github/workflows/build.yml` | CI: builds, tests and publishes both apps |
 | `.github/scripts/smoke-test.sh` | Runs the Android release APK on an emulator before anything is published |
+| `.github/scripts/desktop-window-test.mjs` | Runs the built `NewsCenter.exe` on Windows and checks a channel in its own window, driving both windows through the browser's debugging port |
 | `.github/scripts/knesset-web-test.mjs` | Tests the Knesset view on a phone, a tablet and the desktop against the Knesset's live services |
 
 ## How builds and releases work
@@ -29,7 +30,8 @@ builds and tests the same way but publishes nothing:
 
 1. **android**: `gradle assembleRelease` (R8 on), `gradle testDebugUnitTest`, then a smoke test on
    an Android 14 emulator: open the app, play a public test stream from a
-   `newscenter://play?url=…` link, open every tab and Settings, go to the home screen. The Knesset
+   `newscenter://play?url=…` link, open every tab and Settings, pop the test stream out into a
+   floating window (picture-in-picture) and back, go to the home screen. The Knesset
    tab must show its first page (the Knesset not answering the emulator is only a warning) without
    script errors. Any crash fails
    the job (decoded with the build's R8 mapping file). Screenshots are kept as `smoke-*.png`.
@@ -43,7 +45,15 @@ builds and tests the same way but publishes nothing:
    Every `adb` call has a time limit and the step stops after 20 minutes, so a frozen emulator
    can't hold the pipeline. The Israeli channels play from GitHub's servers too, so the
    screenshots show real channels.
-2. **desktop** (Windows): `host\build.cmd`, then `news-center-windows-N.zip` (`NewsCenter.exe`, `app/`,
+2. **desktop** (Windows): `host\build.cmd`, then `desktop-window-test.mjs` runs the new
+   `NewsCenter.exe` on the build machine (installing the WebView2 Runtime first if it's missing)
+   with a public test stream as the only channel, and drives the main window and the channel's own
+   window through the browser's debugging port (`NEWSCENTER_DEBUG_PORT`): the channel moves to its
+   own window and plays there; S, M and "hear only this" in the window change the main window's
+   mixer and come back; pin (checked with Windows itself), fullscreen and `Esc`; the window's back
+   button, closing the window as a user does and as another program does all put the channel back;
+   after a restart it reopens in its window. Screenshots of both pages and of the desktop: the run's
+   `desktop-test` artifact. Only then is `news-center-windows-N.zip` made (`NewsCenter.exe`, `app/`,
    `DESKTOP.md` as `README.md`, `LICENSE`).
 3. **knesset-web**: `knesset-web-test.mjs` opens the Knesset view in headless Chrome, as the
    Android page on a phone (dark and light colors) and a tablet and as the Windows dashboard,
@@ -162,7 +172,7 @@ Get-ChildItem android/app/src/main/res -Recurse -Filter *.xml | ForEach-Object {
 Select-String -Path android/app/src/main/res/values*/strings.xml -Encoding UTF8 -Pattern '<(string|item)[^>]*>(?!")[^<]*(?<!\\)'''
 ```
 
-Compiling, unit tests and the emulator test run in CI.
+Compiling, unit tests, the emulator test and the Windows app's window test run in CI.
 
 ## Crash reports
 

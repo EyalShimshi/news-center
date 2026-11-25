@@ -2,9 +2,11 @@ package io.github.eyalshimshi.newscenter
 
 import android.app.PictureInPictureParams
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.media.AudioManager
 import android.os.Bundle
+import android.util.Log
 import android.util.Rational
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
@@ -13,14 +15,17 @@ import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import io.github.eyalshimshi.newscenter.playback.PlayerPool
 import io.github.eyalshimshi.newscenter.ui.NewsCenterApp
 import io.github.eyalshimshi.newscenter.ui.NewsCenterViewModel
 import io.github.eyalshimshi.newscenter.ui.theme.NewsCenterTheme
 import io.github.eyalshimshi.newscenter.ui.theme.isDarkTheme
+import io.github.eyalshimshi.newscenter.ui.watch.LocalPopOut
 import kotlinx.coroutines.flow.MutableStateFlow
 
 class MainActivity : AppCompatActivity() {
@@ -34,6 +39,7 @@ class MainActivity : AppCompatActivity() {
         // The volume keys change the media volume even while every channel is muted.
         volumeControlStream = AudioManager.STREAM_MUSIC
         if (savedInstanceState == null) handleIntent(intent)
+        val popOut: (() -> Unit)? = if (packageManager.hasSystemFeature(PackageManager.FEATURE_PICTURE_IN_PICTURE)) this::popOut else null
 
         setContent {
             val settings by viewModel.settings.collectAsStateWithLifecycle()
@@ -58,8 +64,10 @@ class MainActivity : AppCompatActivity() {
                     // A Knesset recording on screen isn't the spotlight, so leaving doesn't shrink it into one.
                     val canEnterPip = current.pictureInPicture && pipChannel != null && pipChannel.isStream && recording == null
                     LaunchedEffect(canEnterPip) { updatePictureInPicture(canEnterPip) }
-                    Surface(color = MaterialTheme.colorScheme.background) {
-                        NewsCenterApp(viewModel = viewModel, settings = current, inPictureInPicture = pip)
+                    CompositionLocalProvider(LocalPopOut provides popOut) {
+                        Surface(color = MaterialTheme.colorScheme.background) {
+                            NewsCenterApp(viewModel = viewModel, settings = current, inPictureInPicture = pip)
+                        }
                     }
                 }
             }
@@ -80,6 +88,7 @@ class MainActivity : AppCompatActivity() {
     override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean, newConfig: Configuration) {
         super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
         inPictureInPicture.value = isInPictureInPictureMode
+        Log.i(PlayerPool.TAG, if (isInPictureInPictureMode) "picture-in-picture on" else "picture-in-picture off")
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -105,6 +114,18 @@ class MainActivity : AppCompatActivity() {
                     .setSeamlessResizeEnabled(enabled)
                     .build(),
             )
+        }
+    }
+
+    /**
+     * The pop-out button: the channel on the big screen goes into a floating window right away,
+     * whether or not leaving the app does that (Settings). Android says no when picture-in-picture
+     * is turned off for the app in its settings.
+     */
+    private fun popOut() {
+        val params = PictureInPictureParams.Builder().setAspectRatio(Rational(16, 9)).build()
+        if (!runCatching { enterPictureInPictureMode(params) }.getOrDefault(false)) {
+            viewModel.showMessage(getString(R.string.pop_out_unavailable))
         }
     }
 }

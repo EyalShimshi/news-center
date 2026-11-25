@@ -18,8 +18,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
@@ -177,6 +179,20 @@ fun SpotlightCard(
                                 .width(9.dp)
                                 .fillMaxHeight(0.6f),
                         )
+                    }
+                    LocalPopOut.current?.let { popOut ->
+                        FilledTonalIconButton(
+                            onClick = popOut,
+                            colors = IconButtonDefaults.filledTonalIconButtonColors(
+                                containerColor = Color.Black.copy(alpha = 0.55f),
+                                contentColor = Color.White,
+                            ),
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .padding(6.dp),
+                        ) {
+                            Icon(AppIcons.PictureInPictureAlt, contentDescription = stringResource(R.string.action_pop_out))
+                        }
                     }
                 }
             }
