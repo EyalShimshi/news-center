@@ -67,7 +67,7 @@ static class WindowPlacement
         }
     }
 
-    static bool IsOnScreen(Rectangle bounds) =>
+    internal static bool IsOnScreen(Rectangle bounds) =>
         Screen.AllScreens.Any(screen =>
         {
             var visible = Rectangle.Intersect(screen.WorkingArea, bounds);

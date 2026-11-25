@@ -40,6 +40,8 @@
     <symbol id="i-maximize" viewBox="0 0 24 24"><rect x="6.5" y="6.5" width="11" height="11" rx="1.5" stroke-width="1.5"/></symbol>
     <symbol id="i-restore" viewBox="0 0 24 24"><rect x="6" y="8.5" width="9.5" height="9.5" rx="1.5" stroke-width="1.5"/><path d="M8.5 8.5V7.5A1.5 1.5 0 0 1 10 6h6.5A1.5 1.5 0 0 1 18 7.5V14a1.5 1.5 0 0 1-1.5 1.5h-1" stroke-width="1.5"/></symbol>
     <symbol id="i-window-close" viewBox="0 0 24 24"><path d="M7 7l10 10M17 7L7 17" stroke-width="1.5"/></symbol>
+    <symbol id="i-window" viewBox="0 0 24 24"><rect x="3" y="9" width="12" height="11" rx="1.5"/><path d="M8.5 9V5.5A1.5 1.5 0 0 1 10 4h8.5A1.5 1.5 0 0 1 20 5.5V12a1.5 1.5 0 0 1-1.5 1.5H15"/></symbol>
+    <symbol id="i-pin" viewBox="0 0 24 24"><path d="M9 4h6"/><path d="M10 4v5.5L7 13h10l-3-3.5V4"/><path d="M12 13v7"/></symbol>
   </svg>
 
   <div class="resize-handles" aria-hidden="true">
@@ -212,6 +214,7 @@
     <span><kbd>S</kbd> solo</span>
     <span><kbd>Enter</kbd> spotlight + solo</span>
     <span><kbd>F</kbd> fullscreen</span>
+    <span><kbd>D</kbd> own window</span>
     <span><kbd>+</kbd><kbd>−</kbd> tile size</span>
     <span><kbd>V</kbd> meter</span>
     <span><kbd>N</kbd> news</span>
@@ -304,6 +307,7 @@
         <dt><kbd>Enter</kbd>, the button in the middle of a channel</dt><dd>Spotlight the channel and hear only it; every other channel is muted. Again to go back to the grid.</dd>
         <dt><kbd>↑</kbd> <kbd>↓</kbd></dt><dd>Selected channel volume, up to 200%</dd>
         <dt><kbd>F</kbd>, double-click</dt><dd>Fill the window with the selected channel</dd>
+        <dt><kbd>D</kbd>, <svg class="icon inline-icon" aria-label="the own-window button"><use href="#i-window"/></svg></dt><dd>Open the selected channel in its own window, to put anywhere: another monitor, or on top of other apps. Its sound follows the mixer here. In that window, <kbd>F</kbd> or a double-click fills its screen, <kbd>T</kbd> keeps it on top, and <kbd>D</kbd> or closing it brings the channel back.</dd>
         <dt><kbd>P</kbd></dt><dd>Spotlight the selected channel</dd>
         <dt><kbd>G</kbd></dt><dd>Switch between Grid and Spotlight</dd>
         <dt>Drag a channel</dt><dd>Move it to another place; drop it on the big spotlight channel to swap them</dd>
@@ -365,6 +369,8 @@
           <button type="button" class="icon-btn reload" title="Reload (R)"><svg class="icon"><use href="#i-reload"/></svg></button>
           <button type="button" class="icon-btn spotlight" title="Spotlight (P)"><svg class="icon"><use href="#i-spotlight"/></svg></button>
           <button type="button" class="icon-btn fullscreen" title="Fill the window (F)"><svg class="icon"><use href="#i-fullscreen"/></svg></button>
+          <button type="button" class="icon-btn pin" aria-pressed="false" title="Keep this window on top of other windows (T)"><svg class="icon"><use href="#i-pin"/></svg></button>
+          <button type="button" class="icon-btn detach" title="Open in its own window, to put anywhere (D)"><svg class="icon"><use href="#i-window"/></svg></button>
         </div>
       </div>
     </article>

@@ -3,6 +3,9 @@
   'use strict';
 
   const STORAGE_KEY = 'newscenter.state.v2';
+  // A channel in its own window runs this same page as index.html?channel=<id>: one tile whose
+  // sound follows the main window's mixer (see "Own windows" below and host/src/ChannelWindow.cs).
+  const OWN_WINDOW_ID = new URLSearchParams(location.search).get('channel');
   const ASPECT = 16 / 9;
   const MIN_TILE_WIDTH = 200;
   const MAX_VOLUME = 2;
@@ -276,6 +279,8 @@
       now: cleanText(raw.now, 300),
       volume: Number.isFinite(raw.volume) ? clamp(raw.volume, 0, maxVolume(kind)) : 1,
       meter: raw.meter !== false,
+      // Shown in a window of its own instead of in the grid (remembered across starts).
+      ownWindow: raw.ownWindow === true,
       // Every channel starts muted each time News Center opens.
       muted: true,
       soloed: false,
@@ -433,9 +438,11 @@
     saveTimer = setTimeout(writeState, 150);
   }
 
-  // Mute and solo are not saved: every session starts with all channels muted.
+  // Mute and solo are not saved: every session starts with all channels muted. Only the main
+  // window saves; a channel's own window just reads the saved channels.
   function writeState() {
     clearTimeout(saveTimer);
+    if (OWN_WINDOW_ID) return;
     try {
       const channels = state.channels.map(({ muted, soloed, ...channel }) => channel);
       localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...state, channels }));
@@ -470,14 +477,19 @@
   }
 
   const shownChannels = () => state.channels.filter(isShown);
-  const orderedTiles = () => shownChannels().map(channel => tiles.get(channel.id)).filter(Boolean);
+  // A channel in its own window is on air (and in the mix) but not in the grid.
+  const inOwnWindow = channel => channel.ownWindow && host.available && !OWN_WINDOW_ID;
+  const gridChannels = () => shownChannels().filter(channel => !inOwnWindow(channel));
+  const orderedTiles = () => gridChannels().map(channel => tiles.get(channel.id)).filter(Boolean);
   const selectedTile = () => tiles.get(state.selectedId) || orderedTiles()[0] || null;
 
   function channelStatus(channel) {
     if (!channel.enabled) return 'hidden';
     if (!isListed(channel)) return 'unlisted';
     const tile = tiles.get(channel.id);
-    return tile ? tile.status : availabilityOf(channel);
+    if (tile) return tile.status;
+    const own = ownWindows.get(channel.id);
+    return own && own.status ? own.status : availabilityOf(channel);
   }
 
   /* ---------- Audio ---------- */
@@ -611,6 +623,22 @@
       setFader(ui.fader, channel.volume);
     }
 
+    // Channels in their own windows follow the same rules; their windows apply the result.
+    for (const channel of shown) {
+      if (!ownWindows.has(channel.id)) continue;
+      const audible = !channel.muted && (!soloActive || channel.soloed);
+      tellWindow(channel.id, {
+        type: 'sound',
+        gain: audible ? loudness(channel.volume) : 0,
+        masterGain,
+        volume: channel.volume,
+        muted: channel.muted,
+        soloed: channel.soloed,
+        audible,
+        alone: audible && channel.soloed && shown.every(other => other === channel || !other.soloed),
+      });
+    }
+
     if (audio.ctx) audio.setGain(audio.master, masterGain);
     dom.anySolo.disabled = !soloActive;
     dom.anySolo.classList.toggle('active', soloActive);
@@ -688,6 +716,8 @@
       focusLabel: $('.focus-label', el),
       meterToggle: $('.meter-toggle', el),
       meterIcon: $('.meter-toggle use', el),
+      detach: $('.detach', el),
+      pin: $('.pin', el),
     };
   }
 
@@ -702,6 +732,9 @@
     $('.reload', el).addEventListener('click', () => tile.restart());
     $('.retry', el).addEventListener('click', () => tile.restart());
     $('.spotlight', el).addEventListener('click', () => toggleSpotlight(id()));
+    // In the grid: to its own window. In its own window: back to the grid.
+    ui.detach.addEventListener('click', () => (OWN_WINDOW_ID ? tellMain({ type: 'back' }) : openOwnWindow(id())));
+    ui.pin.addEventListener('click', () => host.post({ type: 'window', action: 'pin' }));
     ui.fullscreen.addEventListener('click', () => toggleFullscreen(id()));
     $('.screen', el).addEventListener('dblclick', () => toggleFullscreen(id()));
     // The second click of a double-click would undo the first.
@@ -1152,6 +1185,11 @@
     info.detail = detail;
     if (availability === 'offline') info.lastCheck = Date.now();
     if (previous === availability) return;
+    // A channel's own window reports to the main window, which decides what is shown where.
+    if (OWN_WINDOW_ID) {
+      tellMain({ type: 'availability', availability, detail });
+      return;
+    }
     const channel = findChannel(id);
     if (started && channel && previous === 'offline' && availability === 'live' && wantsScreen(channel)) {
       showToast([bidi(channel.name), ' is live']);
@@ -1342,16 +1380,28 @@
   /* ---------- Sync ---------- */
 
   function onTileStatus(tile) {
+    if (OWN_WINDOW_ID) {
+      tellMain({ type: 'status', status: tile.status });
+      return;
+    }
     renderSummary();
-    const row = dom.channelList.querySelector(`[data-id="${CSS.escape(tile.channel.id)}"]`);
-    if (row) paintRow(row, tile.channel);
+    repaintRow(tile.channel.id);
   }
 
-  // Creates, updates and removes tiles to match the channel list and what is on air.
+  function repaintRow(id) {
+    const row = dom.channelList.querySelector(`[data-id="${CSS.escape(id)}"]`);
+    const channel = findChannel(id);
+    if (row && channel) paintRow(row, channel);
+  }
+
+  // Creates, updates and removes tiles to match the channel list and what is on air, and opens or
+  // closes the windows of channels shown in their own.
   function syncChannels(animate = false) {
     const shown = shownChannels();
     const shownIds = new Set(shown.map(channel => channel.id));
-    if (drag && drag.active && (drag.order.length !== shown.length || drag.order.some(tile => !shownIds.has(tile.channel.id)))) {
+    const grid = shown.filter(channel => !inOwnWindow(channel));
+    const gridIds = new Set(grid.map(channel => channel.id));
+    if (drag && drag.active && (drag.order.length !== grid.length || drag.order.some(tile => !gridIds.has(tile.channel.id)))) {
       endDrag(false);
     }
     for (const channel of state.channels) {
@@ -1359,12 +1409,12 @@
     }
     for (const [id, tile] of tiles) {
       const channel = findChannel(id);
-      if (!shownIds.has(id) || !channel || channel.kind !== tile.kind) {
+      if (!gridIds.has(id) || !channel || channel.kind !== tile.kind) {
         tile.destroy();
         tiles.delete(id);
       }
     }
-    shown.forEach((channel, index) => {
+    grid.forEach((channel, index) => {
       let tile = tiles.get(channel.id);
       if (!tile) {
         tile = channel.kind === 'page' ? new PageTile(channel) : new StreamTile(channel);
@@ -1377,9 +1427,10 @@
       // Keep a saved selection while that channel is still being checked at start-up.
       const selected = findChannel(state.selectedId);
       const pending = selected && wantsScreen(selected) && availabilityOf(selected) === 'checking';
-      if (!pending) state.selectedId = shown.length ? shown[0].id : null;
+      if (!pending) state.selectedId = grid.length ? grid[0].id : null;
     }
     if (fullscreenId && !tiles.has(fullscreenId)) setFullscreen(null);
+    syncOwnWindows();
     renderSelection();
     applyAudio();
     relayout(animate);
@@ -1481,7 +1532,7 @@
   }
 
   function spotlightId() {
-    const ids = shownChannels().map(channel => channel.id);
+    const ids = gridChannels().map(channel => channel.id);
     if (ids.includes(state.spotlightId)) return state.spotlightId;
     return tiles.has(state.selectedId) ? state.selectedId : ids[0];
   }
@@ -1814,6 +1865,7 @@
   }
 
   function toggleSpotlight(id) {
+    if (OWN_WINDOW_ID) return;
     selectChannel(id);
     if (state.layout === 'spotlight' && spotlightId() === id) {
       setLayout('grid');
@@ -1845,7 +1897,8 @@
       const active = tile.channel.id === fullscreenId;
       tile.el.classList.toggle('is-fullscreen', active);
       $('use', tile.ui.fullscreen).setAttribute('href', active ? '#i-exit-fullscreen' : '#i-fullscreen');
-      tile.ui.fullscreen.title = active ? 'Back to the grid (F or Esc)' : 'Fill the window (F)';
+      if (OWN_WINDOW_ID) tile.ui.fullscreen.title = active ? 'Leave fullscreen (F or Esc)' : 'Fill the screen (F)';
+      else tile.ui.fullscreen.title = active ? 'Back to the grid (F or Esc)' : 'Fill the window (F)';
     }
     document.body.classList.toggle('has-fullscreen', Boolean(fullscreenId));
     revealTopbar(false);
@@ -1859,7 +1912,14 @@
     }
   }
 
-  const toggleFullscreen = id => setFullscreen(fullscreenId === id ? null : id);
+  // In a channel's own window, "fullscreen" fills its monitor (the host does that).
+  function toggleFullscreen(id) {
+    if (OWN_WINDOW_ID) {
+      host.post({ type: 'window', action: 'fullscreen' });
+      return;
+    }
+    setFullscreen(fullscreenId === id ? null : id);
+  }
 
   function markActive() {
     document.body.classList.remove('is-idle');
@@ -1920,6 +1980,10 @@
   }
 
   function toggleMute(id) {
+    if (OWN_WINDOW_ID) {
+      tellMain({ type: 'mute' });
+      return;
+    }
     const channel = findChannel(id);
     if (!channel) return;
     channel.muted = !channel.muted;
@@ -1929,6 +1993,10 @@
   // Solo adds a channel to the set that is heard; soloing a muted channel also unmutes it.
   // Exclusive solo (Ctrl+click or Shift+S) keeps only this channel soloed.
   function toggleSolo(id, exclusive) {
+    if (OWN_WINDOW_ID) {
+      tellMain({ type: 'solo', exclusive: Boolean(exclusive) });
+      return;
+    }
     const channel = findChannel(id);
     if (!channel) return;
     if (exclusive) {
@@ -1958,8 +2026,13 @@
   }
 
   // Makes a channel the big one and the only one heard, muting every other channel. Doing it
-  // again on the same channel goes back to the grid and leaves its sound on.
+  // again on the same channel goes back to the grid and leaves its sound on. In a channel's own
+  // window it only makes the channel the one heard (hearOnly).
   function toggleFocus(id) {
+    if (OWN_WINDOW_ID) {
+      tellMain({ type: 'alone' });
+      return;
+    }
     const channel = findChannel(id);
     if (!channel || !tiles.has(id)) return;
     if (focusedId() === id) {
@@ -2011,14 +2084,253 @@
     }
   }
 
+  /* ---------- Own windows ---------- */
+
+  // A channel can leave the grid for a window of its own, to put anywhere: another monitor, or on
+  // top of other apps. The host opens that window with this page in single-channel mode
+  // (index.html?channel=<id>). The main window keeps the channel's sound rules and talks to the
+  // window over a BroadcastChannel (both pages share the origin and the browser profile).
+  const ownWindows = new Map();
+  const windowBus = 'BroadcastChannel' in window ? new BroadcastChannel('newscenter-windows') : null;
+  // A window the user just asked for comes to the front; one that reopens by itself doesn't.
+  const raiseOnOpen = new Set();
+
+  function tellWindow(id, message) {
+    if (windowBus) windowBus.postMessage({ ...message, to: id });
+  }
+
+  function tellMain(message) {
+    if (windowBus) windowBus.postMessage({ ...message, from: OWN_WINDOW_ID });
+  }
+
+  // What a channel's window needs to show the channel.
+  const windowChannel = ({ id, name, description, kind, url, poster, now, meter }) => ({ id, name, description, kind, url, poster, now, meter });
+
+  // Opens and closes windows to match the channels that should be in them (while they're on air),
+  // and keeps the windows' channel details current.
+  function syncOwnWindows() {
+    if (OWN_WINDOW_ID || !host.available) return;
+    for (const channel of state.channels) {
+      const wanted = inOwnWindow(channel) && isShown(channel);
+      const info = ownWindows.get(channel.id);
+      if (wanted && !info) {
+        ownWindows.set(channel.id, { status: '', sent: JSON.stringify(windowChannel(channel)) });
+        host.post({ type: 'channel-window', action: 'open', id: channel.id, name: channel.name, activate: raiseOnOpen.delete(channel.id) });
+      } else if (!wanted && info) {
+        ownWindows.delete(channel.id);
+        host.post({ type: 'channel-window', action: 'close', id: channel.id });
+      } else if (wanted) {
+        const details = JSON.stringify(windowChannel(channel));
+        if (details !== info.sent) {
+          info.sent = details;
+          tellWindow(channel.id, { type: 'channel', channel: windowChannel(channel) });
+        }
+      }
+    }
+    for (const id of [...ownWindows.keys()]) {
+      if (findChannel(id)) continue;
+      ownWindows.delete(id);
+      host.post({ type: 'channel-window', action: 'close', id });
+    }
+  }
+
+  function openOwnWindow(id) {
+    const channel = findChannel(id);
+    if (!channel || OWN_WINDOW_ID || !host.available) return;
+    if (channel.ownWindow) {
+      // Already in its own window: that window comes forward.
+      host.post({ type: 'channel-window', action: 'open', id, name: channel.name, activate: true });
+      return;
+    }
+    channel.ownWindow = true;
+    raiseOnOpen.add(id);
+    if (fullscreenId === id) setFullscreen(null);
+    // The new window reads the channel from the saved settings.
+    writeState();
+    syncChannels(true);
+    showToast([bidi(channel.name), ' is in its own window'], { actionLabel: 'Bring back', onAction: () => bringBack(id) });
+  }
+
+  // From its own window back into the grid.
+  function bringBack(id) {
+    const channel = findChannel(id);
+    if (!channel || !channel.ownWindow) return;
+    channel.ownWindow = false;
+    syncChannels(true);
+    selectChannel(id);
+    revealTile(id);
+    saveState();
+  }
+
+  // "Hear only this" in a channel's own window: what the spotlight button does to the sound in
+  // the grid. Again stops soloing the channel and leaves its sound on (unless toggle is false).
+  function hearOnly(id, { toggle = true } = {}) {
+    const channel = findChannel(id);
+    if (!channel) return;
+    const alone = !channel.muted && channel.soloed && shownChannels().every(other => other === channel || !other.soloed);
+    if (alone) {
+      if (toggle) channel.soloed = false;
+    } else {
+      for (const other of state.channels) {
+        other.soloed = other === channel;
+        if (other !== channel) other.muted = true;
+      }
+      channel.muted = false;
+    }
+    applyAudio();
+  }
+
+  // Requests from the channels' own windows.
+  function onWindowMessage(data) {
+    if (!data || typeof data !== 'object' || typeof data.from !== 'string' || typeof data.type !== 'string') return;
+    const id = data.from;
+    const channel = findChannel(id);
+    const info = ownWindows.get(id);
+    if (!channel || !info) return;
+    switch (data.type) {
+      case 'hello':
+        info.sent = JSON.stringify(windowChannel(channel));
+        tellWindow(id, { type: 'channel', channel: windowChannel(channel) });
+        applyAudio();
+        break;
+      case 'mute': toggleMute(id); break;
+      case 'solo': toggleSolo(id, data.exclusive === true); break;
+      case 'alone': hearOnly(id); break;
+      case 'volume': if (Number.isFinite(data.volume)) setVolume(id, data.volume); break;
+      case 'meter': toggleMeter(id); break;
+      case 'back': bringBack(id); break;
+      case 'status':
+        info.status = typeof data.status === 'string' ? data.status : '';
+        renderSummary();
+        repaintRow(id);
+        break;
+      case 'availability':
+        if (['live', 'offline', 'error'].includes(data.availability)) setAvailability(id, data.availability, cleanText(data.detail, 160));
+        break;
+      default:
+        break;
+    }
+  }
+
+  /* ---------- A channel's own window ---------- */
+
+  // This page as a channel's own window: one tile filling the window. Its sound and buttons go
+  // through the main window (tellMain); pinning and fullscreen through the host.
+  function startOwnWindow() {
+    document.documentElement.classList.add('own-window');
+    window.newscenter = { flush() {} };
+    audio.init();
+    document.body.classList.toggle('no-meters', !audio.ctx);
+    const channel = findChannel(OWN_WINDOW_ID);
+    if (!channel) {
+      host.post({ type: 'window', action: 'close' });
+      return;
+    }
+    document.title = `${channel.name} – News Center`;
+    const tile = channel.kind === 'page' ? new PageTile(channel) : new StreamTile(channel);
+    tiles.set(channel.id, tile);
+    dom.stage.append(tile.el);
+    tile.update(channel, 1);
+    // Silent until the main window says how loud it should be.
+    tile.setGain(0, 0);
+    if (audio.ctx) audio.setGain(audio.master, 0);
+    tile.ui.detach.title = 'Back to the main window (D)';
+    tile.ui.detach.setAttribute('aria-label', 'Back to the main window');
+    $('use', tile.ui.detach).setAttribute('href', '#i-grid');
+    tile.ui.fullscreen.title = 'Fill the screen (F)';
+    renderAlone(tile, false);
+
+    if (windowBus) windowBus.addEventListener('message', ({ data }) => onMainMessage(tile, data));
+    host.on('window-state', message => {
+      setFullscreen(message.fullscreen ? channel.id : null);
+      const pinned = Boolean(message.pinned);
+      tile.ui.pin.setAttribute('aria-pressed', String(pinned));
+      tile.ui.pin.title = pinned ? 'Stop keeping this window on top (T)' : 'Keep this window on top of other windows (T)';
+    });
+    // If the browser held the sound back, the first click or key starts it.
+    for (const type of ['pointerdown', 'keydown']) {
+      document.addEventListener(type, () => {
+        if (audio.ctx && audio.ctx.state !== 'running') audio.ctx.resume().catch(() => {});
+      }, true);
+    }
+    bindFullscreenChrome();
+    bindKeyboard();
+    setInterval(() => tile.tick(Date.now()), 1000);
+    requestAnimationFrame(animateMeters);
+    host.post({ type: 'ready' });
+    tellMain({ type: 'hello' });
+  }
+
+  function renderAlone(tile, alone) {
+    const { el, ui } = tile;
+    el.classList.toggle('is-focused', alone);
+    ui.focusLabel.textContent = alone ? 'Heard alone' : 'Hear only this';
+    const title = alone ? 'Only this channel is heard; again to stop soloing it (Enter)' : 'Hear only this channel; the others are muted (Enter)';
+    ui.focus.title = title;
+    ui.focus.setAttribute('aria-label', title);
+  }
+
+  // The main window's sound rules and channel details, for this window's channel.
+  function onMainMessage(tile, data) {
+    if (!data || typeof data !== 'object' || data.to !== OWN_WINDOW_ID) return;
+    const { channel, el, ui } = tile;
+    if (data.type === 'sound') {
+      const masterGain = Number(data.masterGain) || 0;
+      channel.muted = data.muted === true;
+      channel.soloed = data.soloed === true;
+      if (Number.isFinite(data.volume)) channel.volume = data.volume;
+      tile.setGain(Number(data.gain) || 0, masterGain);
+      if (audio.ctx) audio.setGain(audio.master, masterGain);
+      el.classList.toggle('is-muted', channel.muted);
+      el.classList.toggle('is-soloed', channel.soloed);
+      el.classList.toggle('is-silent', data.audible !== true);
+      ui.mute.setAttribute('aria-pressed', String(channel.muted));
+      ui.solo.setAttribute('aria-pressed', String(channel.soloed));
+      ui.audioFlag.title = channel.muted ? 'Muted' : 'Silent while other channels are soloed';
+      setFader(ui.fader, channel.volume);
+      renderAlone(tile, data.alone === true);
+    } else if (data.type === 'channel' && data.channel && typeof data.channel === 'object') {
+      const next = normalizeChannel({ ...data.channel, id: OWN_WINDOW_ID });
+      if (!next) return;
+      tile.update({ ...channel, ...windowChannel(next) }, 1);
+      document.title = `${tile.channel.name} – News Center`;
+    }
+  }
+
+  // Keys in a channel's own window.
+  function ownWindowShortcut({ code, shiftKey, target }) {
+    const tile = tiles.get(OWN_WINDOW_ID);
+    if (!tile || document.querySelector('dialog[open]')) return false;
+    const onTabbedControl = target instanceof Element && target === tabbedTo && Boolean(target.closest('button, input'));
+    switch (code) {
+      case 'KeyM': tellMain({ type: 'mute' }); return true;
+      case 'KeyS': tellMain({ type: 'solo', exclusive: shiftKey }); return true;
+      case 'Enter': case 'NumpadEnter': if (onTabbedControl) return false; tellMain({ type: 'alone' }); return true;
+      case 'KeyF': case 'F11': host.post({ type: 'window', action: 'fullscreen' }); return true;
+      case 'Escape': if (!fullscreenId) return false; host.post({ type: 'window', action: 'exit-fullscreen' }); return true;
+      case 'KeyR': tile.restart(); return true;
+      case 'KeyV': tellMain({ type: 'meter' }); return true;
+      case 'KeyT': host.post({ type: 'window', action: 'pin' }); return true;
+      case 'KeyD': tellMain({ type: 'back' }); return true;
+      case 'ArrowUp': tellMain({ type: 'volume', volume: tile.channel.volume + 0.05 }); return true;
+      case 'ArrowDown': tellMain({ type: 'volume', volume: tile.channel.volume - 0.05 }); return true;
+      default: return false;
+    }
+  }
+
   /* ---------- Level meters ---------- */
 
   function toggleMeter(id) {
+    if (OWN_WINDOW_ID) {
+      tellMain({ type: 'meter' });
+      return;
+    }
     const channel = findChannel(id);
     if (!channel) return;
     channel.meter = !channel.meter;
     const tile = tiles.get(id);
     if (tile) renderMeterToggle(tile);
+    syncOwnWindows();
     saveState();
   }
 
@@ -2027,6 +2339,7 @@
     const show = !shownChannels().some(channel => channel.meter);
     state.channels.forEach(channel => { channel.meter = show; });
     tiles.forEach(renderMeterToggle);
+    syncOwnWindows();
     saveState();
     showToast(show ? 'Level meters shown' : 'Level meters hidden');
   }
@@ -2038,6 +2351,10 @@
   }
 
   function setVolume(id, volume) {
+    if (OWN_WINDOW_ID) {
+      tellMain({ type: 'volume', volume });
+      return;
+    }
     const channel = findChannel(id);
     if (!channel) return;
     channel.volume = clamp(Math.round(volume * 100) / 100, 0, maxVolume(channel.kind));
@@ -2046,8 +2363,9 @@
   }
 
   function renderSummary() {
-    const list = orderedTiles();
-    const count = (...statuses) => list.filter(tile => statuses.includes(tile.status)).length;
+    // Channels in their own windows count with the tiles.
+    const statuses = [...orderedTiles().map(tile => tile.status), ...[...ownWindows.values()].map(info => info.status)];
+    const count = (...wanted) => statuses.filter(status => wanted.includes(status)).length;
     const streams = state.channels.filter(channel => channel.kind === 'stream' && wantsScreen(channel));
     const live = count('live', 'buffering');
     const connecting = count('connecting') + streams.filter(channel => availabilityOf(channel) === 'checking').length;
@@ -2067,6 +2385,13 @@
     const empty = tiles.size === 0;
     dom.emptyState.hidden = !empty;
     if (!empty) return;
+    if (ownWindows.size) {
+      dom.emptyState.classList.remove('is-checking');
+      dom.emptyTitle.textContent = 'Every channel on air is in its own window';
+      dom.emptyText.textContent = 'Close a channel’s window to bring it back here.';
+      dom.emptyAction.hidden = true;
+      return;
+    }
     const checking = !started || state.channels.some(channel => channel.kind === 'stream' && wantsScreen(channel) && availabilityOf(channel) === 'checking');
     dom.emptyState.classList.toggle('is-checking', checking);
     dom.emptyTitle.textContent = checking ? 'Checking channels…' : 'Nothing on air right now';
@@ -2154,7 +2479,7 @@
     });
     dom.channelList.replaceChildren(...rows);
     const total = state.channels.length;
-    dom.managerCount.textContent = `${total} channel${total === 1 ? '' : 's'} · ${tiles.size} on screen`;
+    dom.managerCount.textContent = `${total} channel${total === 1 ? '' : 's'} · ${tiles.size + ownWindows.size} on screen`;
     if (focusedId) {
       const row = dom.channelList.querySelector(`[data-id="${CSS.escape(focusedId)}"]`);
       if (row) row.focus({ preventScroll: true });
@@ -2163,9 +2488,10 @@
 
   function paintRow(row, channel) {
     const status = channelStatus(channel);
+    const own = ownWindows.has(channel.id);
     row.dataset.status = status;
-    row.classList.toggle('is-dimmed', !tiles.has(channel.id));
-    const parts = [ROW_STATUS_TEXT[status], channel.now || channel.description, hostName(channel.url)];
+    row.classList.toggle('is-dimmed', !tiles.has(channel.id) && !own);
+    const parts = [ROW_STATUS_TEXT[status], own ? 'in its own window' : '', channel.now || channel.description, hostName(channel.url)];
     $('.row-meta', row).textContent = parts.filter(Boolean).join(' · ');
     $('.row-dot', row).title = ROW_STATUS_TEXT[status] || '';
   }
@@ -3372,6 +3698,7 @@
   // Shared by the dashboard's own key presses and those passed on from web-page channels,
   // whose frames keep keyboard focus after a click. Returns whether the key was used.
   function handleShortcut({ code, shiftKey, target = null }) {
+    if (OWN_WINDOW_ID) return ownWindowShortcut({ code, shiftKey, target });
     // The Knesset view covers the channels: only its own keys work while it's open.
     if (knesset && knesset.isOpen()) {
       if (document.querySelector('dialog[open]')) return false;
@@ -3409,6 +3736,7 @@
       case 'KeyM': if (id) toggleMute(id); return true;
       case 'KeyS': if (id) toggleSolo(id, shiftKey); return true;
       case 'KeyF': if (id) toggleFullscreen(id); return true;
+      case 'KeyD': if (!id || !host.available) return false; openOwnWindow(id); return true;
       case 'KeyR': if (tile) tile.restart(); return true;
       case 'KeyP': if (id) toggleSpotlight(id); return true;
       case 'KeyG': setLayout(state.layout === 'grid' ? 'spotlight' : 'grid'); return true;
@@ -3535,6 +3863,12 @@
   // Opens a Knesset stream from the Knesset view: it becomes the big channel, heard alone.
   function watchKnessetChannel(id) {
     const channel = findChannel(id);
+    // In its own window: that window comes forward, and the channel is the one heard.
+    if (channel && ownWindows.has(id)) {
+      hearOnly(id, { toggle: false });
+      openOwnWindow(id);
+      return;
+    }
     if (!channel || !tiles.has(id)) {
       showToast(channel ? ['Not on air right now: ', bidi(channel.name)] : 'This stream is not on air right now');
       return;
@@ -3543,7 +3877,7 @@
     revealTile(id);
   }
 
-  const knesset = typeof window.NewsCenterKnesset === 'function' ? window.NewsCenterKnesset({
+  const knesset = !OWN_WINDOW_ID && typeof window.NewsCenterKnesset === 'function' ? window.NewsCenterKnesset({
     fetchText: url => host.fetchText(url),
     showToast: message => showToast(message),
     knessetChannels: () => state.channels.filter(channel => channel.auto === 'knesset' && channel.kind === 'stream').map(channel => ({
@@ -3552,7 +3886,7 @@
       url: channel.url,
       now: channel.now || '',
       main: channel.builtin === true,
-      live: isShown(channel) && tiles.has(channel.id),
+      live: isShown(channel) && (tiles.has(channel.id) || ownWindows.has(channel.id)),
     })),
     watchChannel: watchKnessetChannel,
     silenceTv(on) {
@@ -3586,28 +3920,37 @@
     setInterval(() => runDiscovery(), DISCOVERY_INTERVAL_MS);
   }
 
-  // Lets the News Center window save settings right before it closes.
-  window.newscenter = { flush: writeState };
+  if (OWN_WINDOW_ID) {
+    startOwnWindow();
+  } else {
+    // Lets the News Center window save settings right before it closes.
+    window.newscenter = { flush: writeState };
+    if (windowBus) windowBus.addEventListener('message', ({ data }) => onWindowMessage(data));
+    // The user closed a channel's window: the channel comes back to the grid.
+    host.on('channel-window-closed', message => {
+      if (typeof message.id === 'string' && ownWindows.delete(message.id)) bringBack(message.id);
+    });
 
-  audio.init();
-  document.body.classList.toggle('no-meters', !audio.ctx);
-  bindWindowChrome();
-  bindGlobalControls();
-  bindFullscreenChrome();
-  bindManager();
-  bindEditor();
-  bindNews();
-  bindTileDragging();
-  bindKeyboard();
-  renderLayoutButtons();
-  renderZoom();
-  syncChannels(false);
-  renderNews();
-  new ResizeObserver(() => layoutTiles()).observe(dom.stage);
-  tick();
-  setInterval(tick, 1000);
-  setInterval(newsTick, NEWS_TICK_MS);
-  requestAnimationFrame(animateMeters);
-  loadDueSources();
-  startup();
+    audio.init();
+    document.body.classList.toggle('no-meters', !audio.ctx);
+    bindWindowChrome();
+    bindGlobalControls();
+    bindFullscreenChrome();
+    bindManager();
+    bindEditor();
+    bindNews();
+    bindTileDragging();
+    bindKeyboard();
+    renderLayoutButtons();
+    renderZoom();
+    syncChannels(false);
+    renderNews();
+    new ResizeObserver(() => layoutTiles()).observe(dom.stage);
+    tick();
+    setInterval(tick, 1000);
+    setInterval(newsTick, NEWS_TICK_MS);
+    requestAnimationFrame(animateMeters);
+    loadDueSources();
+    startup();
+  }
 })();

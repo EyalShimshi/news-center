@@ -682,6 +682,24 @@ body.has-fullscreen.is-idle .tile.is-fullscreen[data-kind="stream"] .bar { opaci
 body.has-fullscreen.is-idle .tile.is-fullscreen[data-kind="stream"] { cursor: none; }
 body.has-fullscreen.is-idle .tile.is-fullscreen .badges { opacity: 0; transition: opacity .3s; }
 
+/* ---------- A channel in its own window ---------- */
+
+/* In the grid, the button that moves a channel to its own window (only inside the News Center app). */
+.controls :is(.detach, .pin) { display: none; }
+.in-host .controls .detach { display: inline-grid; }
+@container (max-width: 520px) { .in-host .controls .detach { display: none; } }
+.controls .pin[aria-pressed="true"] { color: var(--accent); }
+
+/* The page as a channel's own window (index.html?channel=<id>): just the channel, filling it. */
+.own-window :is(.topbar, .banner, .news, .drawer, .statusbar, .reveal-zone, .resize-handles, .empty-state) { display: none !important; }
+.own-window body { background: #000; }
+.own-window .workspace { display: block; }
+.own-window .stage { position: fixed; inset: 0; padding: 0; overflow: hidden; }
+.own-window .tile { inset: 0; border-radius: 0; box-shadow: none; outline: none; }
+.own-window .tile.is-soloed { outline: 2px solid var(--solo); outline-offset: -2px; }
+.own-window :is(.num, .controls .spotlight) { display: none; }
+.own-window .controls :is(.detach, .pin, .fullscreen) { display: inline-grid; }
+
 /* ---------- Channel manager ---------- */
 
 .drawer {
@@ -1022,6 +1040,7 @@ body.has-fullscreen.is-idle .tile.is-fullscreen .badges { opacity: 0; transition
 .shortcuts { display: grid; grid-template-columns: auto 1fr; gap: 9px 18px; margin: 0; }
 .shortcuts dt { white-space: nowrap; }
 .shortcuts dd { margin: 0; color: #c8cedb; }
+.shortcuts .inline-icon { width: 16px; height: 16px; vertical-align: -3px; }
 
 .statusbar {
   display: flex;

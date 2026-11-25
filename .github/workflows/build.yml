@@ -229,6 +229,35 @@ jobs:
         shell: cmd
         run: host\build.cmd
 
+      # The test below runs the real program, which needs the WebView2 Runtime.
+      - name: Make sure the WebView2 Runtime is installed
+        shell: pwsh
+        run: |
+          $key = 'HKLM:\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}'
+          if (Test-Path $key) { "WebView2 Runtime $((Get-ItemProperty $key).pv) is installed"; exit 0 }
+          Invoke-WebRequest -Uri 'https://go.microsoft.com/fwlink/p/?LinkId=2124703' -OutFile "$env:RUNNER_TEMP\webview2-setup.exe"
+          Start-Process -FilePath "$env:RUNNER_TEMP\webview2-setup.exe" -ArgumentList '/silent', '/install' -Wait
+          "WebView2 Runtime $((Get-ItemProperty $key).pv) installed"
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      # NewsCenter.exe on this machine: a channel to its own window and back (see the script).
+      # A failure stops the job before the Windows zip is uploaded, so it isn't published.
+      - name: Test a channel in its own window
+        shell: pwsh
+        run: node .github/scripts/desktop-window-test.mjs desktop-test
+
+      - name: Upload the window test's screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-test
+          path: desktop-test/
+          if-no-files-found: ignore
+
       - name: Package the desktop app
         shell: pwsh
         run: |

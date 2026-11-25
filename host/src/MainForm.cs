@@ -22,8 +22,8 @@ namespace NewsCenter;
 // window controls; this class keeps native behavior such as Snap, resizing and the taskbar.
 sealed class MainForm : Form
 {
-    const string AppHost = "newscenter.example";
-    const string AppOrigin = "https://" + AppHost;
+    internal const string AppHost = "newscenter.example";
+    internal const string AppOrigin = "https://" + AppHost;
     const int MaxFetchBytes = 4 * 1024 * 1024;
     const int MaxRedirects = 5;
 
@@ -42,6 +42,10 @@ sealed class MainForm : Form
     readonly WebView2 view;
     readonly RegisteredWaitHandle activateRegistration;
     readonly bool debug;
+    // Channels shown in their own windows, by channel id (see ChannelWindow).
+    readonly Dictionary<string, ChannelWindow> channelWindows = new(StringComparer.Ordinal);
+    CoreWebView2Environment environment;
+    bool closingApp;
     FormWindowState lastState;
     FormWindowState stateBeforeMinimize = FormWindowState.Normal;
     string userAgent;
@@ -256,6 +260,9 @@ sealed class MainForm : Form
             Close();
             return;
         }
+        // The channels' own windows close with News Center and reopen with it next time.
+        closingApp = true;
+        foreach (var window in new List<ChannelWindow>(channelWindows.Values)) window.CloseByApp();
         WindowPlacement.Save(this, WindowState == FormWindowState.Minimized && stateBeforeMinimize == FormWindowState.Maximized);
         activateRegistration.Unregister(null);
         base.OnFormClosing(e);
@@ -289,12 +296,26 @@ sealed class MainForm : Form
         var arguments = "--autoplay-policy=no-user-gesture-required --disable-features=HardwareMediaKeyHandling";
         if (debug) arguments += " --remote-debugging-port=" + Environment.GetEnvironmentVariable("NEWSCENTER_DEBUG_PORT");
         var options = new CoreWebView2EnvironmentOptions(arguments);
-        var environment = await CoreWebView2Environment.CreateAsync(null, Path.Combine(Program.DataFolder, "WebView2"), options);
+        environment = await CoreWebView2Environment.CreateAsync(null, Path.Combine(Program.DataFolder, "WebView2"), options);
         await view.EnsureCoreWebView2Async(environment);
 
         var core = view.CoreWebView2;
+        await PrepareBrowserAsync(core, environment, appFolder, debug);
+        // The page draws the title bar; CSS app-region marks where it moves the window.
+        core.Settings.IsNonClientRegionSupportEnabled = true;
+        userAgent = core.Settings.UserAgent;
+        core.WebMessageReceived += OnWebMessageReceived;
+        core.ProcessFailed += OnProcessFailed;
+        core.DocumentTitleChanged += (_, _) => Text = string.IsNullOrWhiteSpace(core.DocumentTitle) ? "News Center" : core.DocumentTitle;
+        core.Navigate(AppOrigin + "/index.html");
+    }
+
+    // What every News Center browser view shares – the dashboard and the channels' own windows:
+    // the app folder as https://newscenter.example, blocked sites, links in the user's browser,
+    // autoplay, an editing-only context menu, and the helper for web-page channels.
+    internal static async Task PrepareBrowserAsync(CoreWebView2 core, CoreWebView2Environment environment, string appFolder, bool debug)
+    {
         var settings = core.Settings;
-        settings.IsNonClientRegionSupportEnabled = true;
         settings.AreBrowserAcceleratorKeysEnabled = false;
         settings.AreDevToolsEnabled = debug;
         settings.IsStatusBarEnabled = false;
@@ -303,7 +324,6 @@ sealed class MainForm : Form
         settings.IsSwipeNavigationEnabled = false;
         settings.IsGeneralAutofillEnabled = false;
         settings.IsPasswordAutosaveEnabled = false;
-        userAgent = settings.UserAgent;
 
         core.SetVirtualHostNameToFolderMapping(AppHost, appFolder, CoreWebView2HostResourceAccessKind.Allow);
         foreach (var domain in BlockedDomains)
@@ -317,19 +337,14 @@ sealed class MainForm : Form
         {
             if (IsBlocked(e.Request.Uri)) e.Response = environment.CreateWebResourceResponse(null, 403, "Blocked", "Content-Type: text/plain");
         };
-        core.WebMessageReceived += OnWebMessageReceived;
         core.NavigationStarting += OnNavigationStarting;
         core.NewWindowRequested += OnNewWindowRequested;
         core.PermissionRequested += OnPermissionRequested;
-        core.ContextMenuRequested += OnContextMenuRequested;
-        core.ProcessFailed += OnProcessFailed;
-        core.DocumentTitleChanged += (_, _) => Text = string.IsNullOrWhiteSpace(core.DocumentTitle) ? "News Center" : core.DocumentTitle;
+        core.ContextMenuRequested += (_, e) => TrimContextMenu(e, debug);
 
         // Runs in every frame; it only acts inside web pages that the dashboard shows as channels.
         var helper = Path.Combine(appFolder, "page-helper.js");
         if (File.Exists(helper)) await core.AddScriptToExecuteOnDocumentCreatedAsync(File.ReadAllText(helper));
-
-        core.Navigate(AppOrigin + "/index.html");
     }
 
     void OnWebMessageReceived(object sender, CoreWebView2WebMessageReceivedEventArgs e)
@@ -360,7 +375,47 @@ sealed class MainForm : Form
             case "fetch":
                 _ = FetchAsync(GetString(message, "id"), GetString(message, "url"));
                 break;
+            case "channel-window":
+                var windowAction = GetString(message, "action");
+                var channelId = GetString(message, "id");
+                var channelName = GetString(message, "name");
+                var activate = message.TryGetValue("activate", out var activateValue) && activateValue is true;
+                BeginInvoke(new Action(() => RunChannelWindowCommand(windowAction, channelId, channelName, activate)));
+                break;
         }
+    }
+
+    // The dashboard opens a channel's own window when the channel moves there (or comes back on
+    // air), and closes it when the channel leaves it (or goes off air).
+    void RunChannelWindowCommand(string action, string id, string name, bool activate)
+    {
+        if (string.IsNullOrEmpty(id) || id.Length > 300) return;
+        switch (action)
+        {
+            case "open":
+                if (channelWindows.TryGetValue(id, out var existing))
+                {
+                    if (!activate) return;
+                    if (existing.WindowState == FormWindowState.Minimized) existing.WindowState = FormWindowState.Normal;
+                    existing.Activate();
+                    return;
+                }
+                if (environment == null || closingApp || IsDisposed) return;
+                var window = new ChannelWindow(this, environment, appFolder, debug, id, name, activate, channelWindows.Count);
+                channelWindows[id] = window;
+                window.Show();
+                break;
+            case "close":
+                if (channelWindows.TryGetValue(id, out var open)) open.CloseByApp();
+                break;
+        }
+    }
+
+    // When the user closes a channel's window, the dashboard puts the channel back in the grid.
+    internal void OnChannelWindowClosed(ChannelWindow window, bool byUser)
+    {
+        if (channelWindows.TryGetValue(window.ChannelId, out var current) && current == window) channelWindows.Remove(window.ChannelId);
+        if (byUser && !closingApp) Post(new Dictionary<string, object> { ["type"] = "channel-window-closed", ["id"] = window.ChannelId });
     }
 
     // Fetches a page or a news feed for the dashboard without the browser's cross-site
@@ -442,7 +497,7 @@ sealed class MainForm : Form
         return EncodingNamed(match.Groups[1].Success ? match.Groups[1].Value : match.Groups[2].Value);
     }
 
-    void OnNavigationStarting(object sender, CoreWebView2NavigationStartingEventArgs e)
+    static void OnNavigationStarting(object sender, CoreWebView2NavigationStartingEventArgs e)
     {
         if (e.Uri.StartsWith(AppOrigin + "/", StringComparison.OrdinalIgnoreCase)) return;
         // Keep the dashboard in the window; anything that tries to replace it opens in the browser.
@@ -450,13 +505,13 @@ sealed class MainForm : Form
         if (e.IsUserInitiated) OpenExternal(e.Uri);
     }
 
-    void OnNewWindowRequested(object sender, CoreWebView2NewWindowRequestedEventArgs e)
+    static void OnNewWindowRequested(object sender, CoreWebView2NewWindowRequestedEventArgs e)
     {
         e.Handled = true;
         if (e.IsUserInitiated) OpenExternal(e.Uri);
     }
 
-    void OnPermissionRequested(object sender, CoreWebView2PermissionRequestedEventArgs e)
+    static void OnPermissionRequested(object sender, CoreWebView2PermissionRequestedEventArgs e)
     {
         e.State = e.PermissionKind == CoreWebView2PermissionKind.Autoplay
             ? CoreWebView2PermissionState.Allow
@@ -464,7 +519,7 @@ sealed class MainForm : Form
     }
 
     // Keeps only editing commands, so the window feels like an app rather than a browser.
-    void OnContextMenuRequested(object sender, CoreWebView2ContextMenuRequestedEventArgs e)
+    static void TrimContextMenu(CoreWebView2ContextMenuRequestedEventArgs e, bool debug)
     {
         if (debug) return;
         var items = e.MenuItems;
@@ -506,7 +561,7 @@ sealed class MainForm : Form
         }
     }
 
-    static string GetString(Dictionary<string, object> message, string key) =>
+    internal static string GetString(Dictionary<string, object> message, string key) =>
         message.TryGetValue(key, out var value) ? Convert.ToString(value) : null;
 
     static void OpenExternal(string address)
