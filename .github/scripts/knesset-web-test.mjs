@@ -295,19 +295,27 @@ const OPENERS = {
   mks: `document.querySelector('${ROOT_SEL} .kn-main .kn-mk')`,
 };
 
+// Requests the Knesset didn't answer so far (no connection, or a server error). A page that shows a
+// problem right after one of these is the Knesset not answering, which is only a warning.
+const unanswered = () => upstream.filter(entry => entry.status === 0 || entry.status >= 500).length;
+const notAnsweredNote = ' (the Knesset didn\'t answer)';
+
 async function openTab(label, tab) {
   const started = Date.now();
+  const failures = unanswered();
   await evaluate(`document.querySelector('${ROOT_SEL} [data-tab="${tab}"]').click()`);
   await settle(`${label} ${tab}`);
   const info = await evaluate(`(() => {
     const main = document.querySelector('${ROOT_SEL} .kn-main');
     return { problem: main.querySelector('.kn-problem')?.textContent.replace(/\\s+/g, ' ').trim() || '', text: main.innerText.length, sections: main.querySelectorAll('.kn-section').length };
   })()`);
-  check(`${label}: ${tab} loads`, !info.problem && info.text > 200, `${Date.now() - started} ms, ${info.sections} sections${info.problem ? `, problem: ${info.problem}` : ''}`);
+  const down = Boolean(info.problem) && unanswered() > failures;
+  check(`${label}: ${tab} loads`, !info.problem && info.text > 200, `${Date.now() - started} ms, ${info.sections} sections${info.problem ? `, problem: ${info.problem}` : ''}${down ? notAnsweredNote : ''}`, { soft: down });
   return info;
 }
 
 async function openDetailOf(label, tab, { back }) {
+  const failures = unanswered();
   const opened = await evaluate(`(() => { const el = ${OPENERS[tab]}; if (!el) return false; el.click(); return true; })()`);
   if (!opened) {
     check(`${label}: ${tab} has an item to open`, false, 'none on the page', { soft: true });
@@ -316,7 +324,8 @@ async function openDetailOf(label, tab, { back }) {
   await waitFor(() => evaluate(`(() => { const d = document.querySelector('${ROOT_SEL} .kn-detail'); return d && !d.hidden && !d.querySelector('.kn-loading'); })()`), 60000, `${label} ${tab} detail`);
   await sleep(600);
   const detail = await evaluate(`(() => { const d = document.querySelector('${ROOT_SEL} .kn-detail'); const r = d.getBoundingClientRect(); return { title: d.querySelector('h3')?.innerText || '', problem: d.querySelector('.kn-problem')?.textContent.replace(/\\s+/g, ' ').trim() || '', text: d.innerText.length, width: r.width, height: r.height, top: r.top, innerWidth, innerHeight }; })()`);
-  check(`${label}: ${tab} detail opens`, !detail.problem && detail.text > 80, `"${detail.title.slice(0, 50)}"${detail.problem ? `, problem: ${detail.problem}` : ''}`);
+  const down = Boolean(detail.problem) && unanswered() > failures;
+  check(`${label}: ${tab} detail opens`, !detail.problem && detail.text > 80, `"${detail.title.slice(0, 50)}"${detail.problem ? `, problem: ${detail.problem}` : ''}${down ? notAnsweredNote : ''}`, { soft: down });
   if (back) {
     await shot(`${label}-detail-${tab}`);
     await checkFits(`${label} ${tab} detail`);
