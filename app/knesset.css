@@ -321,7 +321,7 @@
 .kn-item.is-inactive .kn-item-name { text-decoration: line-through; }
 .kn-item-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; }
 .kn-letter { flex: none; color: var(--kn-gold-text, #ffe39a); font-weight: 700; }
-.kn-item-name { flex: 1 1 240px; min-width: 0; font-size: 14.5px; }
+.kn-item-name { min-width: 0; font-size: 14.5px; }
 .kn-item-meta, .kn-item-roles { margin: 0; color: var(--kn-text-2, #c9d0de); font-size: 12.5px; }
 .kn-notes { display: flex; flex-wrap: wrap; gap: 4px 6px; margin: 0; padding: 0; list-style: none; }
 .kn-notes li { padding: 2px 8px; border-radius: 6px; background: var(--surface-2); color: var(--kn-text-2, #c9d0de); font-size: 12px; }

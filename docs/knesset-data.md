@@ -77,7 +77,7 @@ Requests to avoid (they return 500, or a WAF "access denied" 473): `Entity(key)?
 | `MKs/GetParlamentayActivity?mkId=<website id>&knessetId=<n>` | An MK's bills, votes, questions and motions in a Knesset |
 | `Votes/GetVoteDetails/<vote>` | A vote's title, decision, totals and each MK's vote with faction |
 | `LegislationItem/GetLegislationBillItem?ItemId=<bill>` | The bill's stage in plain words, initiators, every session it was discussed in (with recordings), documents |
-| `Global/GetAllHolidays` | Holidays and memorial days |
+| `Global/GetAllHolidays` | The holidays the Knesset lists |
 
 The bundles name about 150 calls in all (committee decisions, conclusions, reports, budget
 requests; MK expenses, speeches, positions; factions and splits; caucuses; the smart plenum
@@ -126,7 +126,9 @@ are none yet.
   the calendar asks for those only for the day you choose.
 - Plenum sittings come from `KNS_PlenumSession`, the next one from `GetNextSession` before that, and
   each sitting's number of votes from `KNS_PlenumVote` (`SessionID`).
-- `Global/GetAllHolidays` lists holidays and memorial days from 2018 to 2050 (`Name`, `Date`).
+- `Global/GetAllHolidays` lists, from 2018 to 2050 (`Name`, `Date`), the main Jewish holidays with
+  their eves and the intermediate days (ראש השנה, יום כפור, סוכות, פסח, שבועות) and Independence Day –
+  not Hanukkah, Purim or the memorial days.
 - `KNS_KnessetDates` gives each working period (מושב) its start and end: the days outside them are
   recess, or between two Knessets. The Passover break inside a period isn't in the data.
 

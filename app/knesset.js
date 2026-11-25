@@ -67,6 +67,12 @@
         else el.setAttribute(key, value === true ? '' : value);
       }
     }
+    return fill(el, ...children);
+  }
+
+  // Adds children the way h() does: nested lists flattened, and null, false and '' left out (the
+  // DOM's own append would write them out as text).
+  function fill(el, ...children) {
     for (const child of children.flat(Infinity)) {
       if (child == null || child === false || child === '') continue;
       el.append(child instanceof Node ? child : String(child));
@@ -1132,7 +1138,7 @@
         item.type === 2 && item.itemId ? button('שלבי החקיקה', () => openBill({ Id: item.itemId, Name: item.name }), 'kn-btn small') : null,
         votes.length === 1 ? button('תוצאת ההצבעה', () => openVote(votes[0]), 'kn-btn small') : null,
       ].filter(Boolean);
-      li.append(
+      fill(li,
         h('div', { class: 'kn-item-head' },
           item.letter ? h('span', { class: 'kn-letter' }, `${item.letter}.`) : null,
           h('strong', { class: 'kn-item-name' }, item.name),
@@ -1466,7 +1472,8 @@
         ? [h('h4', null, `דיונים בוועדות (${sessions.length})`), h('ul', { class: 'kn-agenda kn-cal-list' }, sessions.map(session => calendarSessionRow(session, now, liveNames)))]
         : info.sittings.length ? [] : [empty(date.getDay() >= 5 ? 'סוף השבוע: אין דיונים.' : 'אין דיונים ביום הזה.')]);
       list.replaceChildren(...sessionsView(info.sessions));
-      panel.replaceChildren(
+      panel.replaceChildren();
+      fill(panel,
         h('div', { class: 'kn-cal-panel-head' },
           h('h3', null, fullDayFormat.format(date)),
           sameDay(date, now) ? badge('היום') : null,

@@ -281,6 +281,13 @@ async function checkFits(label) {
     return { page, main: main.scrollWidth - main.clientWidth, out };
   })()`);
   check(`${label}: fits the screen`, info.page <= 1 && info.main <= 1 && info.out.length === 0, info.page > 1 || info.main > 1 || info.out.length ? JSON.stringify(info) : '', { hard: true });
+  // Text a page should never show: a value that didn't exist, or an object written out as text.
+  const junk = await evaluate(`(() => {
+    const text = [...document.querySelectorAll('${ROOT_SEL} .kn-main, ${ROOT_SEL} .kn-detail:not([hidden])')].map(el => el.innerText).join('\\n');
+    const match = text.match(/.{0,30}(?:\\bnull\\b|\\bundefined\\b|\\bNaN\\b|\\[object [A-Za-z]+\\]).{0,30}/);
+    return match ? match[0] : '';
+  })()`);
+  check(`${label}: no stray "null" or "[object …]" text`, !junk, junk, { hard: true });
 }
 
 const TABS = ['today', 'calendar', 'committees', 'plenum', 'votes', 'bills', 'mks', 'government', 'guide'];
